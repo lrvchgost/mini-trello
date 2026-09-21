@@ -17,10 +17,27 @@ Kanban-доска с JWT-авторизацией, drag-and-drop, live-обно�
 | [07-infrastructure](docs/architecture/07-infrastructure.md) | Docker Compose, CI/CD, env, dev-инструменты |
 | [08-testing](docs/architecture/08-testing.md) | Unit + E2E, мокинг через DI |
 
-## Быстрый старт
+Пошаговый план: [docs/plan/README.md](docs/plan/README.md).
+
+## Быстрый старт (одна команда)
+
+Всё приложение (backend + frontend + БД, Redis внутри) поднимается одной командой:
+
+```bash
+docker compose up
+```
+
+Compose использует безопасные dev-дефолты из `docker-compose.yml`; `.env` опционален —
+скопируйте `.env.example` в `.env`, если нужно переопределить переменные.
+
+После старта: фронт — http://localhost, API — http://localhost/api, Swagger — http://localhost/api/docs.
+Демо-доступы: `alice@example.com` / `password123`.
+
+## Локальная разработка
 
 ```bash
 pnpm install
+docker compose -f docker-compose.dev.yml up -d   # Postgres + Redis
 pnpm dev          # turbo: FE + BE параллельно
 pnpm db:migrate   # Prisma миграции
 pnpm db:seed      # предзаполненные пользователи
@@ -31,7 +48,7 @@ pnpm db:seed      # предзаполненные пользователи
 | Решение | Альтернатива | Почему выбрано |
 |---------|-------------|----------------|
 | JWT (passport) | Keycloak | Легче, 2 пользователя, без отдельного IdP |
-| bcrypt | argon2 | Нет native-build, стабилен в Docker |
+| bcryptjs | bcrypt / argon2 | Pure JS, без node-gyp — собирается на Alpine |
 | Prisma | TypeORM | Типобезопасность, миграции, хороший DX |
 | Socket.IO | ws | Fallback-транспорты, комнаты, меньше кода |
 | ky | axios | Легче, fetch-based, типизированный |
@@ -39,3 +56,4 @@ pnpm db:seed      # предзаполненные пользователи
 | MDXEditor | rich-markdown-editor | rich-markdown-editor не поддерживается (React 18) |
 | Recharts | Chart.js | React-friendly, декларативный, `ResponsiveContainer` |
 | winston | pino | Привычнее команде (опционально: Pino быстрее) |
+| Ownership-only, assignee = владелец | board members | Нет требования на коллаборацию — проще guard и схема ([ADR-008](docs/decisions/adr-008-ownership-only-access.md)) |

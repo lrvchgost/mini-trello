@@ -23,7 +23,8 @@
 
 - Меньше кода для лога: нет комнат/подписок, обычный HTTP-стрим.
 - Nginx требует отдельный `location` для SSE (`proxy_buffering off`, долгий `proxy_read_timeout`).
-- Redis adapter нужен только для Socket.IO (см. [ADR-002](./adr-002-why-redis.md)).
+- Redis нужен для Socket.IO adapter и для Pub/Sub-доставки activity между инстансами
+  (см. [ADR-002](./adr-002-why-redis.md)).
 
 ## Альтернативы
 

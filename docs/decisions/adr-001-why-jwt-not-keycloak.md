@@ -10,7 +10,8 @@ Keycloak даёт SSO, управление realm, полный lifecycle пол
 
 ## Решение
 
-Используем `@nestjs/passport` + `@nestjs/jwt` с bcrypt для хеширования паролей.
+Используем `@nestjs/passport` + `@nestjs/jwt` с bcryptjs для хеширования паролей
+(pure-JS, без нативной сборки под Alpine).
 
 ## Последствия
 

@@ -22,7 +22,8 @@ User ──owner──> Board ──has──> Column ──has──> Card ─�
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]   // prod-образ на alpine
 }
 
 datasource db {
@@ -68,8 +69,9 @@ model Board {
 }
 
 model Column {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   title   String
+  isDone  Boolean @default(false)   // терминальная колонка для stats/overdue
   order   Int
   boardId String
   board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -102,6 +104,8 @@ model Card {
   updatedAt DateTime @updatedAt
 
   @@index([columnId, order])
+  @@index([assigneeId])
+  @@index([deadline])
 }
 
 model Label {
@@ -140,7 +144,7 @@ model Comment {
 model ActivityLog {
   id        String   @id @default(cuid())
   action    String   // "card.created" | "card.moved" | "card.updated" | "comment.created" | ...
-  payload   Json?    // { fromColumnId, toColumnId, oldOrder, newOrder, changes }
+  payload   Json?    // { fromColumnId, targetColumnId, newOrder, changes }
   boardId   String
   board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cardId    String?
@@ -163,6 +167,7 @@ model RefreshToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+  @@index([expiresAt])
 }
 ```
 
@@ -174,16 +179,16 @@ model RefreshToken {
 |---------|--------|-------|
 | `Column` | `@@unique([boardId, order])` | Гарантия порядка колонок |
 | `Label` | `@@unique([boardId, name])` | Метки уникальны в пределах доски |
-| `Card` | `@@index([columnId, order])` | Быстрая выборка карточек внутри колонки |
+| `Card` | `@@index([columnId, order])`, `@@index([assigneeId])`, `@@index([deadline])` | Выборка внутри колонки; фильтры по исполнителю и `overdueCards` |
 | `ActivityLog` | `@@index([boardId, createdAt(sort: Desc)])` | Лента активности с сортировкой |
-| `RefreshToken` | `@unique` (`tokenHash`) | Поиск/отзыв refresh-токена |
+| `RefreshToken` | `@unique` (`tokenHash`), `@@index([expiresAt])` | Поиск/отзыв и очистка просроченных |
 
 ---
 
 ## 4. Seed (предзаполненные данные)
 
 Единственный механизм seed — `prisma/seed.ts` (идемпотентный, через `upsert`), запуск `pnpm db:seed`.
-`docker/init.sql` не используется. Пароли хешируются bcrypt с теми же раундами, что и в `AuthService`,
+`docker/init.sql` не используется. Пароли хешируются bcryptjs с теми же раундами, что и в `AuthService`,
 в БД попадают только хеши. Создаются 2 пользователя:
 
 | Email | Пароль | Роль |
@@ -191,7 +196,10 @@ model RefreshToken {
 | `alice@example.com` | `password123` | Обычный пользователь |
 | `bob@example.com` | `password123` | Обычный пользователь |
 
-Также создаётся тестовая доска с колонками (To Do, In Progress, Done) и несколькими карточками.
+Каждому пользователю создаётся по 3 доски (итого 6) с колонками To Do / In Progress / Done
+и по 20 задач на доску (итого 120, по 60 на пользователя), с метками, дедлайнами,
+исполнителями (владелец доски) и комментариями
+(детали — в плане, шаг 4.1).
 
 ---
 

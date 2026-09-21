@@ -27,38 +27,43 @@ describe('CardsService', () => {
   let service: CardsService;
   let mockRepo: jest.Mocked<ICardRepository>;
   let mockActivityService: jest.Mocked<ActivityService>;
+  let mockGateway: jest.Mocked<CardsGateway>;
 
   beforeEach(() => {
     mockRepo = {
       findById: jest.fn(),
-      update: jest.fn(),
-      remove: jest.fn(),
       findManyByColumn: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      move: jest.fn(),
+      remove: jest.fn(),
     };
     mockActivityService = { log: jest.fn() } as any;
+    mockGateway = { emitCardMoved: jest.fn() } as any;
 
-    service = new CardsService(mockRepo, mockActivityService);
+    service = new CardsService(mockRepo, mockActivityService, mockGateway);
   });
 
-  it('should move card and log activity', async () => {
+  it('should move card, log activity and emit event', async () => {
     mockRepo.findById.mockResolvedValue({ id: 'card-1', columnId: 'col-1' } as any);
 
-    await service.moveCard('card-1', 'col-2', 0);
+    await service.moveCard('card-1', 'col-2', 0, 'board-1', 'user-1', 'tab-1');
 
-    expect(mockRepo.update).toHaveBeenCalledWith('card-1', {
-      columnId: 'col-2',
-      order: 0,
-    });
+    expect(mockRepo.move).toHaveBeenCalledWith('card-1', 'col-2', 0);
     expect(mockActivityService.log).toHaveBeenCalledWith(
+      'board-1',
       'card.moved',
       { cardId: 'card-1', targetColumnId: 'col-2' },
     );
+    expect(mockGateway.emitCardMoved).toHaveBeenCalledWith({
+      cardId: 'card-1', targetColumnId: 'col-2', newOrder: 0, actorId: 'user-1', clientId: 'tab-1',
+    });
   });
 
   it('should throw if card not found', async () => {
     mockRepo.findById.mockResolvedValue(null);
 
-    await expect(service.moveCard('bad-id', 'col-2', 0))
+    await expect(service.moveCard('bad-id', 'col-2', 0, 'board-1', 'user-1', 'tab-1'))
       .rejects.toThrow(NotFoundException);
   });
 });
@@ -140,6 +145,9 @@ test('user can create board, add column, and move card', async ({ page }) => {
 | **Frontend: Features** | Все useQuery/useMutation хуки |
 | **Frontend: UI** | Storybook + визуальные тесты (chromatic опц.) |
 | **E2E** | 5 ключевых пользовательских сценариев |
+
+Пороги: интеграционный прогон (`test:cov`, шаг 6.1) — сервисы ≥ 80%; критичные сценарии
+(`moveCard`, `createBoard`, `assignCard`) — 100%.
 
 ---
 

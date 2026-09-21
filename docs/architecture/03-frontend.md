@@ -129,9 +129,25 @@ export class HttpCardRepository implements ICardRepository {
 ### Live-события и дедупликация
 
 - Socket.IO события (`card.*`, `board.updated`) → `invalidateQueries` по доске.
-- Свои изменения игнорируем: в событии есть `actorId`; если он равен текущему пользователю — пропускаем.
+- Свои изменения игнорируем по `clientId` (стабильный id вкладки), а не по `actorId`: иначе
+  вторая вкладка того же пользователя не получит обновление. `actorId` остаётся в payload
+  для аудита, но дедуп идёт по `clientId`.
+- ky-клиент добавляет заголовок `X-Client-Id` (стабильный id вкладки) ко всем мутирующим
+  запросам — по нему сервер помечает событие `clientId`.
 - Активность приходит отдельным потоком SSE `GET /api/boards/:id/activity/stream`
   через `@microsoft/fetch-event-source` (умеет слать `Authorization: Bearer`, в отличие от `EventSource`).
+
+### Обновление токена
+
+- ky-интерцептор держит **один общий `refreshPromise`**: параллельные `401` ждут один и тот же
+  `POST /auth/refresh` (single-flight) и повторяют исходный запрос с новым access-токеном.
+- **Между вкладками** refresh координируется `navigator.locks` (`'auth-refresh'`): одна вкладка
+  делает запрос, остальные ждут результат через `BroadcastChannel` и не ротируют токен конкурентно.
+- **Долгие соединения** переживают истечение access-токена (15 мин):
+  - SSE: на `onerror` или при приближении `exp` — refresh и reconnect `fetch-event-source` с новым `Authorization`;
+  - Socket.IO: на `connect_error` с auth-кодом — refresh, `socket.auth = { token }` и reconnect.
+- Сервер дополнительно принимает refresh-токен, отозванный менее `REFRESH_GRACE_SECONDS` назад,
+  и выдаёт новую пару (защита, если координация между вкладками не сработала).
 
 ### Конфликты
 

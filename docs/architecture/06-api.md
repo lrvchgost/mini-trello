@@ -25,6 +25,11 @@ interface Paginated<T> {
 
 Query-параметры: `?page=1&limit=20` (по умолчанию `page=1`, `limit=20`).
 
+Все мутирующие запросы к ресурсам доски (`/api/boards`, `/api/columns`, `/api/cards`,
+`/api/labels`, `/api/comments`) несут заголовок `X-Client-Id: <id вкладки>`; сервер прокидывает
+его как `clientId` в соответствующее WebSocket-событие (§2) — для дедупа своих изменений
+между вкладками. Auth-эндпоинты (`/api/auth/*`) заголовок не используют.
+
 Единый формат ошибки (`AllExceptionsFilter`):
 
 ```ts
@@ -39,7 +44,8 @@ interface ApiError {
 ```
 
 - `401` — нет/просрочен access-токен
-- `403` — нет доступа к доске
+- `403` — нет прав на бизнес-операцию внутри доступной доски;
+  доступ к чужой/несуществующей доске → `404 BOARD_NOT_FOUND` (не раскрываем существование)
 - `409` — конфликт версий (optimistic locking, `expectedUpdatedAt`)
 - `422` — ошибка валидации zod
 
@@ -51,7 +57,7 @@ interface ApiError {
 
 | Method | Path | Ответ | Описание |
 |--------|------|-------|----------|
-| POST | `/api/auth/register` | `201 { user, accessToken }` | Регистрация |
+| POST | `/api/auth/register` | `201 { user, accessToken }` | Регистрация + refresh-cookie |
 | POST | `/api/auth/login` | `200 { user, accessToken }` | Вход |
 | GET | `/api/auth/me` | `200 User` | Текущий пользователь |
 | POST | `/api/auth/refresh` | `200 { accessToken }` | Обновить access-токен по httpOnly cookie |
@@ -59,12 +65,19 @@ interface ApiError {
 
 Access-токен живёт 15 минут и хранится **в памяти** клиента; refresh — 7 дней в
 httpOnly/Secure/SameSite=Lax cookie (см. [ADR-004](../decisions/adr-004-auth-tokens.md)).
+`register`, как и `login`, выставляет refresh-cookie — сессия переживает перезагрузку сразу
+после регистрации.
+
+Дубликат email при `register` → `409 EMAIL_TAKEN`. `refresh` ротируется: клиент объединяет
+параллельные вызовы (single-flight) и координирует вкладки через `navigator.locks` +
+`BroadcastChannel`, а сервер в окне `REFRESH_GRACE_SECONDS` принимает недавно отозванный токен
+и выдаёт новую пару — иначе вкладки разлогиниваются.
 
 ### Users
 
 | Method | Path | Ответ | Описание |
 |--------|------|-------|----------|
-| GET | `/api/users` | `200 User[]` | Все пользователи (для выбора assignee) |
+| GET | `/api/users` | `200 User[]` | Доступные исполнители — массив из одного элемента (текущий пользователь; ownership, [ADR-008](../decisions/adr-008-ownership-only-access.md)) |
 | PATCH | `/api/users/me` | `200 User` | Обновить профиль (`name`) |
 | PATCH | `/api/users/me/password` | `204` | Сменить пароль (`oldPassword`, `newPassword`) |
 
@@ -83,7 +96,7 @@ httpOnly/Secure/SameSite=Lax cookie (см. [ADR-004](../decisions/adr-004-auth-t
 | Method | Path | Ответ | Описание |
 |--------|------|-------|----------|
 | POST | `/api/boards/:boardId/columns` | `201 Column` | Создать колонку |
-| PATCH | `/api/columns/:id` | `200 Column` | Обновить колонку |
+| PATCH | `/api/columns/:id` | `200 Column` | Обновить колонку (`title`, `isDone`, `order`) |
 | DELETE | `/api/columns/:id` | `204` | Удалить колонку |
 
 ### Cards
@@ -94,7 +107,7 @@ httpOnly/Secure/SameSite=Lax cookie (см. [ADR-004](../decisions/adr-004-auth-t
 | GET | `/api/cards/:id` | `200 Card` | Карточка с лейблами, исполнителем, комментариями |
 | PATCH | `/api/cards/:id` | `200 Card` | Обновить карточку (`expectedUpdatedAt` → `409` при рассинхроне) |
 | PATCH | `/api/cards/:id/move` | `200 { columnId, order }` | Переместить (drag&drop) |
-| PATCH | `/api/cards/:id/assignee` | `200 Card` | Назначить исполнителя (`assigneeId: string \| null`) |
+| PATCH | `/api/cards/:id/assignee` | `200 Card` | Назначить исполнителя (`assigneeId: string \| null`); значение обязано равняться владельцу доски, иначе `422` |
 | DELETE | `/api/cards/:id` | `204` | Удалить карточку |
 
 ### Labels
@@ -137,7 +150,7 @@ SSE-события: `activity` (payload — `ActivityLog`), `ping` (heartbeat к
 
 | Method | Path | Ответ | Описание |
 |--------|------|-------|----------|
-| GET | `/api/dashboard/stats` | `200 Stats` | По доскам пользователя: `{ totalBoards, totalCards, cardsByStatus, overdueCards }` |
+| GET | `/api/dashboard/stats` | `200 Stats` | По доскам пользователя: `{ totalBoards, totalCards, cardsByStatus, overdueCards }`. `cardsByStatus` — число карточек по колонкам; `overdueCards` — `deadline < now` вне колонок с `isDone = true` |
 
 ### Health
 
@@ -151,24 +164,29 @@ SSE-события: `activity` (payload — `ActivityLog`), `ping` (heartbeat к
 
 **Комната:** `board:{boardId}`. Клиент подключается с `auth: { token }`; `joinBoard`
 проверяет владельца доски. Активность по WebSocket **не рассылается** — только SSE.
+В payload серверных событий входят `actorId` и `clientId` инициатора; клиент применяет
+событие, если `clientId` не совпадает с его собственным (дедуп между вкладками).
 
 ### Client → Server
 
 | Событие | Payload | Описание |
 |---------|---------|----------|
-| `joinBoard` | `{ boardId }` | Подписаться на обновления доски |
+| `joinBoard` | `{ boardId, clientId }` | Подписаться на обновления доски (`clientId` — id вкладки) |
 | `leaveBoard` | `{ boardId }` | Отписаться |
 
 ### Server → Client
 
 | Событие | Payload | Описание |
 |---------|---------|----------|
-| `board.updated` | `{ board }` | Изменение доски |
-| `card.created` | `{ card }` | Новая карточка |
-| `card.updated` | `{ card }` | Обновление карточки |
-| `card.moved` | `{ cardId, fromColumnId, toColumnId, newOrder }` | Перемещение карточки |
-| `card.deleted` | `{ cardId }` | Удаление карточки |
-| `comment.created` | `{ comment }` | Новый комментарий |
+| `board.updated` | `{ board, actorId, clientId }` | Изменение доски |
+| `column.created` | `{ column, actorId, clientId }` | Новая колонка |
+| `column.updated` | `{ column, actorId, clientId }` | Обновление колонки |
+| `column.deleted` | `{ columnId, actorId, clientId }` | Удаление колонки |
+| `card.created` | `{ card, actorId, clientId }` | Новая карточка |
+| `card.updated` | `{ card, actorId, clientId }` | Обновление карточки |
+| `card.moved` | `{ cardId, targetColumnId, newOrder, actorId, clientId }` | Перемещение карточки |
+| `card.deleted` | `{ cardId, actorId, clientId }` | Удаление карточки |
+| `comment.created` | `{ comment, actorId, clientId }` | Новый комментарий |
 
 ---
 

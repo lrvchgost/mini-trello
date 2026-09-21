@@ -18,7 +18,6 @@
 | **State (client)** | Zustand | Локальное состояние (фильтры, UI) |
 | **Router** | React Router v6 | Навигация |
 | **HTTP-клиент (FE)** | ky | Лёгкий fetch-клиент |
-| **HTTP-клиент (BE)** | @nestjs/axios | Исходящие запросы |
 | **Forms / Validation** | react-hook-form / zod | Формы + схемы |
 | **Drag & Drop** | @hello-pangea/dnd | Карточки между колонками |
 | **Markdown (editor)** | MDXEditor | Редактор описания (markdown-first, поддерживается) |
@@ -30,15 +29,16 @@
 | **ORM** | Prisma | Доступ к БД, миграции |
 | **Auth** | @nestjs/passport + JWT | Регистрация, логин |
 | **Validation (BE)** | zod (через shared) | Валидация DTO |
+| **OpenAPI из zod** | nestjs-zod | Swagger-схемы и DTO из zod |
 | **WebSocket** | Socket.IO | Live-обновления доски (карточки, колонки) |
+| **WS infra** | Redis (@socket.io/redis-adapter) | Горизонтальное масштабирование WebSocket |
 | **SSE** | @microsoft/fetch-event-source | Поток лога активности доски |
 | **API Docs** | @nestjs/swagger | OpenAPI / Swagger UI |
-| **Password hash** | bcrypt | Хеширование паролей |
+| **Password hash** | bcryptjs | Хеширование паролей (pure JS, без node-gyp) |
 | **Rate limit** | @nestjs/throttler | Защита от брута |
 | **Security** | helmet + cors | Заголовки, CORS |
 | **Logging** | winston | Структурированные логи |
 | **Health** | @nestjs/terminus | Health endpoint |
-| **Jobs** | BullMQ + Redis | Напоминания о дедлайнах |
 | **Tests (BE)** | Jest (встроен) | Unit + e2e (supertest) |
 
 ---
@@ -52,7 +52,9 @@ Controller → Service → Repository (interface)
 ```
 
 - **Service** декларирует потребность в `IBoardRepository` — не импортирует Prisma
-- **Module** связывает интерфейс с имплементацией через токен
+- **Module** связывает интерфейс с имплементацией через токен; все токены регистрирует
+  глобальный `RepositoriesModule`, поэтому модули не импортируют друг друга ради репозиториев
+- **BoardAccessGuard** живёт в глобальном `BoardAccessModule` — ему доступны любые репозитории
 - **Тесты мокают интерфейс** — не поднимают БД
 
 Детали: [04-backend.md](./04-backend.md) и [08-testing.md](./08-testing.md)
@@ -64,7 +66,7 @@ Controller → Service → Repository (interface)
 | Слой | Отвечает за | НЕ должен |
 |------|-------------|-----------|
 | **Controller** | Парсинг запроса, вызов сервиса, возврат ответа | Бизнес-логику, доступ к БД |
-| **Service** | Бизнес-логика, оркестрация, события | HTTP, WebSocket, БД напрямую |
+| **Service** | Бизнес-логика, оркестрация, события | HTTP, доменных WS-broadcast'ов, БД напрямую |
 | **Repository** | Только данные (CRUD, query) | Бизнес-логику, валидацию |
 | **Gateway (WS) / SSE Publisher** | Relay событий в Socket.IO и поток активности | Бизнес-логику |
 | **Guard / Interceptor** | Cross-cutting (auth, logging, transform) | Бизнес-логику |

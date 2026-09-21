@@ -1,6 +1,8 @@
 # Min-Trello: Архитектура проекта
 
 > **Архитектура разбита на независимые документы в `docs/architecture/`**
+>
+> **План разработки:** [docs/plan/README.md](docs/plan/README.md)
 
 | Документ | Описание |
 |----------|----------|
@@ -20,4 +22,5 @@
 > [004 Auth-токены](docs/decisions/adr-004-auth-tokens.md) ·
 > [005 Socket.IO + SSE](docs/decisions/adr-005-realtime-sse-and-websocket.md) ·
 > [006 DnD](docs/decisions/adr-006-dnd-library.md) ·
-> [007 Recharts](docs/decisions/adr-007-charts-library.md).
+> [007 Recharts](docs/decisions/adr-007-charts-library.md) ·
+> [008 Ownership-only](docs/decisions/adr-008-ownership-only-access.md).
