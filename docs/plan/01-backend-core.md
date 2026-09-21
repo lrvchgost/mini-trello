@@ -193,7 +193,8 @@ curl -s -o /dev/null -w "%{http_code}" localhost:3000/api/auth/me   # 401 без
 1. `GET /api/users` — текущий пользователь (ownership: assignee = владелец доски),
    id/name/email без password, под `JwtAuthGuard`.
 2. `PATCH /api/users/me` — смена `name`.
-3. `PATCH /api/users/me/password` — проверка старого, bcryptjs-хеш нового, revoke всех refresh.
+3. `PATCH /api/users/me/password` — проверка старого, bcryptjs-хеш нового, revoke всех refresh
+   (удаление записей, чтобы grace-окно не «оживляло» токен); неверный старый → `400`.
 4. Не отдавать `password`/`tokenHash` нигде (select-маскировка).
 5. `USER_REPOSITORY_TOKEN` уже зарегистрирован в 1.3 (нужен был auth) — здесь только используется.
 

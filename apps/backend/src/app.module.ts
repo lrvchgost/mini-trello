@@ -11,6 +11,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 import { AppConfigModule } from './config/config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RepositoriesModule } from './prisma/repositories.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RepositoriesModule } from './prisma/repositories.module';
     PrismaModule,
     RepositoriesModule,
     AuthModule,
+    UsersModule,
     HealthModule,
   ],
   providers: [
