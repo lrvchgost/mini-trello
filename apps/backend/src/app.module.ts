@@ -7,9 +7,17 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { WinstonLogger } from './common/logger/winston.logger';
 import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 import { AppConfigModule } from './config/config.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { RepositoriesModule } from './prisma/repositories.module';
 
 @Module({
-  imports: [AppConfigModule, ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]), HealthModule],
+  imports: [
+    AppConfigModule,
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    PrismaModule,
+    RepositoriesModule,
+    HealthModule,
+  ],
   providers: [
     WinstonLogger,
     { provide: APP_PIPE, useClass: ZodValidationPipe },

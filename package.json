@@ -19,6 +19,10 @@
     "test:cov": "turbo run test:cov",
     "e2e": "turbo run e2e",
     "commit": "cz",
+    "db:generate": "pnpm --filter @min-trello/backend db:generate",
+    "db:migrate": "pnpm --filter @min-trello/backend db:migrate",
+    "db:deploy": "pnpm --filter @min-trello/backend db:deploy",
+    "db:reset": "pnpm --filter @min-trello/backend db:reset",
     "prepare": "husky"
   },
   "devDependencies": {
