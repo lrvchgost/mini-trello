@@ -1,15 +1,17 @@
 import { Global, Module } from '@nestjs/common';
+import { REFRESH_TOKEN_REPOSITORY_TOKEN } from '../auth/repositories/refresh-token.repository';
+import { PrismaRefreshTokenRepository } from '../auth/repositories/prisma-refresh-token.repository';
+import { USER_REPOSITORY_TOKEN } from '../users/repositories/user.repository';
+import { PrismaUserRepository } from '../users/repositories/prisma-user.repository';
 import { PrismaModule } from './prisma.module';
 
-/**
- * Единая точка регистрации репозиториев (`*_REPOSITORY_TOKEN`) — @Global,
- * чтобы feature-модули и guard'ы инжектили токены без imports/forwardRef.
- * Биндинги и реализации добавляются по шагам (1.3/1.4/2.x).
- */
 @Global()
 @Module({
   imports: [PrismaModule],
-  providers: [],
-  exports: [],
+  providers: [
+    { provide: USER_REPOSITORY_TOKEN, useClass: PrismaUserRepository },
+    { provide: REFRESH_TOKEN_REPOSITORY_TOKEN, useClass: PrismaRefreshTokenRepository },
+  ],
+  exports: [USER_REPOSITORY_TOKEN, REFRESH_TOKEN_REPOSITORY_TOKEN],
 })
 export class RepositoriesModule {}

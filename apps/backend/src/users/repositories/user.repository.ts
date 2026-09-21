@@ -2,6 +2,15 @@ import type { User } from '@min-trello/shared';
 
 export const USER_REPOSITORY_TOKEN = 'USER_REPOSITORY';
 
+export interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  password: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CreateUserData {
   email: string;
   name: string;
@@ -10,7 +19,7 @@ export interface CreateUserData {
 
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
-  findByEmail(email: string): Promise<User | null>;
+  findByEmail(email: string): Promise<UserRecord | null>;
   findMany(): Promise<User[]>;
   create(data: CreateUserData): Promise<User>;
   update(id: string, data: { name?: string }): Promise<User>;

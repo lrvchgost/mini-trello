@@ -120,8 +120,10 @@ pnpm --filter @min-trello/backend test:e2e
 
 **Артефакты:**
 - `src/auth/*` (module/controller/service/dto), `strategies/jwt.strategy.ts`, `local.strategy.ts`
-- `src/common/guards/jwt-auth.guard.ts`, `decorators/current-user.decorator.ts`
+- `src/common/guards/jwt-auth.guard.ts`, `decorators/{current-user,public}.decorator.ts`
 - `src/auth/repositories/{refresh-token.repository.ts, prisma-refresh-token.repository.ts}`
+- `src/users/repositories/prisma-user.repository.ts` + биндинг `USER_REPOSITORY_TOKEN`
+  (auth нужен доступ к паролю/email; выносится из 1.4)
 - cookie-настройки (`httpOnly`, `SameSite=Lax`, `Path=/api/auth`)
 
 **Зависимости:** 1.2.
@@ -134,18 +136,24 @@ pnpm --filter @min-trello/backend test:e2e
    Выдача access + refresh-cookie (как в login), чтобы сессия переживала перезагрузку.
 2. `POST /api/auth/login` — проверка пароля, выдача access (15m) + refresh (7d) cookie.
 3. `POST /api/auth/refresh` — ротация refresh (старый revoke, новый hash), новый access в теле.
-   В коротком grace-окне повтор тем же токеном возвращает уже выданную пару (идемпотентность),
-   иначе параллельные refresh из вкладок разлогинивают.
-4. `POST /api/auth/logout` — revoke + очистка cookie.
+   В коротком grace-окне повторно предъявленный отозванный токен принимается и получает новую
+   пару (см. `03-frontend.md#обновление-токена`), иначе параллельные refresh из вкладок разлогинивают.
+4. `POST /api/auth/logout` — удаление записи refresh (а не только `revokedAt`, чтобы grace-окно
+   не «оживляло» токен) + очистка cookie. Роут `@Public()`: вызывается по refresh-cookie, access
+   может быть уже просрочен.
 5. `GET /api/auth/me`.
 6. `JwtAuthGuard` глобально (кроме `@Public()`), `@CurrentUser()`.
 7. Хранение refresh: SHA-256 от токена в `RefreshToken`.
-8. Очистка просроченных/отозванных `RefreshToken` (при логине и/или периодически), чтобы таблица не росла.
+8. Очистка **просроченных** `RefreshToken` при логине/регистрации, чтобы таблица не росла
+   (отозванные храним до истечения `expiresAt` — иначе ломается grace-окно).
 9. Зарегистрировать `REFRESH_TOKEN_REPOSITORY_TOKEN` → `PrismaRefreshTokenRepository` в `RepositoriesModule`.
+10. Зарегистрировать `USER_REPOSITORY_TOKEN` → `PrismaUserRepository` в `RepositoriesModule`.
 
 **Тесты:**
-- Unit: `AuthService` (успех, неверный пароль, дубль email, ротация, revoke).
-- Integration: полный цикл register→refresh (без login)→refresh→logout; запрос без токена → 401.
+- Unit: `AuthService` (успех, неверный пароль, дубль email, ротация, grace, revoke/logout)
+  и `auth.util` (`parseDurationMs`, `hashToken`, генерация токена).
+- Integration: полный цикл register→refresh (без login)→me→logout→refresh(`401`); дубль email → `409`;
+  login с неверным паролем → `401`; запрос без токена → `401`.
 
 **Команда проверки:**
 ```bash
@@ -187,7 +195,7 @@ curl -s -o /dev/null -w "%{http_code}" localhost:3000/api/auth/me   # 401 без
 2. `PATCH /api/users/me` — смена `name`.
 3. `PATCH /api/users/me/password` — проверка старого, bcryptjs-хеш нового, revoke всех refresh.
 4. Не отдавать `password`/`tokenHash` нигде (select-маскировка).
-5. Зарегистрировать `USER_REPOSITORY_TOKEN` → `PrismaUserRepository` в `RepositoriesModule`.
+5. `USER_REPOSITORY_TOKEN` уже зарегистрирован в 1.3 (нужен был auth) — здесь только используется.
 
 **Тесты:** Unit (смена пароля, revoke), Integration (401 без токена, отсутствие password в ответе).
 
