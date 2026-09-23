@@ -117,7 +117,7 @@ httpOnly/Secure/SameSite=Lax cookie (см. [ADR-004](../decisions/adr-004-auth-t
 | POST | `/api/boards/:boardId/labels` | `201 Label` | Создать метку |
 | GET | `/api/boards/:boardId/labels` | `200 Label[]` | Список меток доски |
 | DELETE | `/api/labels/:id` | `204` | Удалить метку |
-| POST | `/api/cards/:cardId/labels` | `200 Card` | Добавить метку к карточке |
+| POST | `/api/cards/:cardId/labels` | `200 CardDetail` | Добавить метку к карточке (`{ labelId }`) |
 | DELETE | `/api/cards/:cardId/labels/:labelId` | `204` | Удалить метку с карточки |
 
 ### Comments

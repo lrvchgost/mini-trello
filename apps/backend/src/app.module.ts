@@ -13,6 +13,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 import { CardsModule } from './cards/cards.module';
 import { ColumnsModule } from './columns/columns.module';
 import { AppConfigModule } from './config/config.module';
+import { LabelsModule } from './labels/labels.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RepositoriesModule } from './prisma/repositories.module';
 import { UsersModule } from './users/users.module';
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module';
     BoardsModule,
     CardsModule,
     ColumnsModule,
+    LabelsModule,
     HealthModule,
   ],
   providers: [

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   activityLogSchema,
+  addLabelSchema,
   assignCardSchema,
   boardWithColumnsSchema,
   createBoardSchema,
@@ -84,6 +85,12 @@ describe('board / column / card schemas', () => {
   it('defaults label color', () => {
     expect(createLabelSchema.parse({ name: 'bug' }).color).toBe('#6b7280');
     expect(createLabelSchema.safeParse({ name: 'bug', color: 'red' }).success).toBe(false);
+  });
+
+  it('validates a card-label link payload', () => {
+    expect(addLabelSchema.safeParse({ labelId: CUID }).success).toBe(true);
+    expect(addLabelSchema.safeParse({ labelId: 'not-cuid' }).success).toBe(false);
+    expect(addLabelSchema.safeParse({}).success).toBe(false);
   });
 
   it('validates comment content', () => {

@@ -9,6 +9,10 @@ import {
   COLUMN_REPOSITORY_TOKEN,
   type IColumnRepository,
 } from '../../columns/repositories/column.repository';
+import {
+  LABEL_REPOSITORY_TOKEN,
+  type ILabelRepository,
+} from '../../labels/repositories/label.repository';
 
 /**
  * Минимальная форма HTTP-запроса, нужная для определения ресурса доски.
@@ -38,12 +42,14 @@ export class BoardAccessResolver {
     private readonly columns: IColumnRepository,
     @Inject(CARD_REPOSITORY_TOKEN)
     private readonly cards: ICardRepository,
+    @Inject(LABEL_REPOSITORY_TOKEN)
+    private readonly labels: ILabelRepository,
   ) {}
 
   /**
    * Возвращает `boardId` ресурса из запроса либо `null`, если маршрут не привязан
-   * к конкретной доске (например, список/создание досок). Ресурсы `comment`/`label`
-   * подключаются по мере появления их репозиториев (шаги 2.4–2.5).
+   * к конкретной доске (например, список/создание досок). Ресурсы `comment`
+   * подключаются по мере появления их репозитория (шаг 2.5).
    */
   async resolveBoardId(req: BoardRequest): Promise<string | null> {
     const route = normalizeRoutePath(req.route?.path ?? req.path);
@@ -54,6 +60,10 @@ export class BoardAccessResolver {
     }
 
     if (route === '/boards/:boardId/columns' && method === 'POST') {
+      return req.params.boardId ?? null;
+    }
+
+    if (route === '/boards/:boardId/labels' && (method === 'GET' || method === 'POST')) {
       return req.params.boardId ?? null;
     }
 
@@ -77,6 +87,18 @@ export class BoardAccessResolver {
       return this.resolveCardBoard(req.params.id);
     }
 
+    if (route === '/cards/:cardId/labels' && method === 'POST') {
+      return this.resolveCardBoard(req.params.cardId);
+    }
+
+    if (route === '/cards/:cardId/labels/:labelId' && method === 'DELETE') {
+      return this.resolveCardBoard(req.params.cardId);
+    }
+
+    if (route === '/labels/:id' && method === 'DELETE') {
+      return this.resolveLabelBoard(req.params.id);
+    }
+
     return null;
   }
 
@@ -97,5 +119,13 @@ export class BoardAccessResolver {
       return null;
     }
     return this.resolveColumnBoard(card.columnId);
+  }
+
+  private async resolveLabelBoard(labelId?: string): Promise<string | null> {
+    if (!labelId) {
+      return null;
+    }
+    const label = await this.labels.findById(labelId);
+    return label?.boardId ?? null;
   }
 }

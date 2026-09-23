@@ -13,3 +13,7 @@ export const createLabelSchema = z.object({
   name: z.string().min(1).max(50),
   color: z.string().regex(HEX_COLOR_REGEX).default(DEFAULT_LABEL_COLOR),
 });
+
+export const addLabelSchema = z.object({
+  labelId: idSchema,
+});
