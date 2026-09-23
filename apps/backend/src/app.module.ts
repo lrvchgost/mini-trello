@@ -10,6 +10,7 @@ import { HealthModule } from './common/health/health.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { WinstonLogger } from './common/logger/winston.logger';
 import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
+import { ColumnsModule } from './columns/columns.module';
 import { AppConfigModule } from './config/config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RepositoriesModule } from './prisma/repositories.module';
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     UsersModule,
     BoardsModule,
+    ColumnsModule,
     HealthModule,
   ],
   providers: [
