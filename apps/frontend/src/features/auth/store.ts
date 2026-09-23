@@ -3,6 +3,7 @@ import type { AuthResponse, LoginInput, RegisterInput, User } from '@min-trello/
 import { api, setUnauthorizedHandler } from '@/shared/api/ky-client';
 import { refreshAccessToken } from '@/shared/api/refresh';
 import { clearAccessToken, setAccessToken } from '@/shared/api/token-store';
+import { resetSocket } from '@/shared/realtime/socket';
 import { extractErrorMessage } from '@/shared/lib/errors';
 
 export type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated';
@@ -62,6 +63,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       // The refresh cookie is httpOnly; the server clears it. Local state is dropped either way.
     }
     clearAccessToken();
+    resetSocket();
     set({ user: null, status: 'unauthenticated', error: null });
   },
 
@@ -79,6 +81,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   forgetSession: () => {
     clearAccessToken();
+    resetSocket();
     set({ user: null, status: 'unauthenticated' });
   },
 }));

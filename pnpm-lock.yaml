@@ -207,6 +207,9 @@ importers:
       '@mdxeditor/editor':
         specifier: ^4.2.5
         version: 4.2.5(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
+      '@microsoft/fetch-event-source':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@min-trello/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -264,6 +267,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      socket.io-client:
+        specifier: ^4
+        version: 4.8.3
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0
@@ -1751,6 +1757,9 @@ packages:
     peerDependencies:
       react: '>= 18 || >= 19'
       react-dom: '>= 18 || >= 19'
+
+  '@microsoft/fetch-event-source@2.0.1':
+    resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
@@ -9960,6 +9969,8 @@ snapshots:
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
+
+  '@microsoft/fetch-event-source@2.0.1': {}
 
   '@microsoft/tsdoc@0.16.0': {}
 

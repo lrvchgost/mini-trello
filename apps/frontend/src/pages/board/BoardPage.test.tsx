@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeHttpError } from '@/test/http-error';
@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/shared/api/ky-client', () => ({ api: mocks.api }));
+vi.mock('@/features/live', () => ({
+  useBoardLive: vi.fn(),
+  useActivityLive: vi.fn(() => 'open'),
+}));
 
 const boardId = 'clx000000000000000000001';
 
@@ -127,5 +131,21 @@ describe('BoardPage', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /добавить колонку/i })).toBeInTheDocument(),
     );
+  });
+
+  it('reveals the activity panel on demand', async () => {
+    mocks.api.get.mockImplementation((path: string) =>
+      path.endsWith('/activity')
+        ? mockJson({ items: [], total: 0, page: 1, limit: 20 })
+        : mockJson(boardJson),
+    );
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Работа' });
+    expect(mocks.api.get).not.toHaveBeenCalledWith(`boards/${boardId}/activity`, expect.anything());
+
+    fireEvent.click(screen.getByRole('button', { name: /активность/i }));
+
+    expect(await screen.findByText('Пока пусто')).toBeInTheDocument();
   });
 });
