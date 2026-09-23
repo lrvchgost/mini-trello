@@ -6,6 +6,10 @@ import {
   type ICardRepository,
 } from '../../cards/repositories/card.repository';
 import {
+  COMMENT_REPOSITORY_TOKEN,
+  type ICommentRepository,
+} from '../../comments/repositories/comment.repository';
+import {
   COLUMN_REPOSITORY_TOKEN,
   type IColumnRepository,
 } from '../../columns/repositories/column.repository';
@@ -44,12 +48,13 @@ export class BoardAccessResolver {
     private readonly cards: ICardRepository,
     @Inject(LABEL_REPOSITORY_TOKEN)
     private readonly labels: ILabelRepository,
+    @Inject(COMMENT_REPOSITORY_TOKEN)
+    private readonly comments: ICommentRepository,
   ) {}
 
   /**
    * Возвращает `boardId` ресурса из запроса либо `null`, если маршрут не привязан
-   * к конкретной доске (например, список/создание досок). Ресурсы `comment`
-   * подключаются по мере появления их репозитория (шаг 2.5).
+   * к конкретной доске (например, список/создание досок).
    */
   async resolveBoardId(req: BoardRequest): Promise<string | null> {
     const route = normalizeRoutePath(req.route?.path ?? req.path);
@@ -99,6 +104,14 @@ export class BoardAccessResolver {
       return this.resolveLabelBoard(req.params.id);
     }
 
+    if (route === '/cards/:cardId/comments' && (method === 'GET' || method === 'POST')) {
+      return this.resolveCardBoard(req.params.cardId);
+    }
+
+    if (route === '/comments/:id' && method === 'DELETE') {
+      return this.resolveCommentBoard(req.params.id);
+    }
+
     return null;
   }
 
@@ -127,5 +140,16 @@ export class BoardAccessResolver {
     }
     const label = await this.labels.findById(labelId);
     return label?.boardId ?? null;
+  }
+
+  private async resolveCommentBoard(commentId?: string): Promise<string | null> {
+    if (!commentId) {
+      return null;
+    }
+    const comment = await this.comments.findById(commentId);
+    if (!comment) {
+      return null;
+    }
+    return this.resolveCardBoard(comment.cardId);
   }
 }

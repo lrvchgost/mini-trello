@@ -7,6 +7,8 @@ import { CARD_REPOSITORY_TOKEN } from '../cards/repositories/card.repository';
 import { PrismaCardRepository } from '../cards/repositories/prisma-card.repository';
 import { COLUMN_REPOSITORY_TOKEN } from '../columns/repositories/column.repository';
 import { PrismaColumnRepository } from '../columns/repositories/prisma-column.repository';
+import { COMMENT_REPOSITORY_TOKEN } from '../comments/repositories/comment.repository';
+import { PrismaCommentRepository } from '../comments/repositories/prisma-comment.repository';
 import { LABEL_REPOSITORY_TOKEN } from '../labels/repositories/label.repository';
 import { PrismaLabelRepository } from '../labels/repositories/prisma-label.repository';
 import { USER_REPOSITORY_TOKEN } from '../users/repositories/user.repository';
@@ -23,6 +25,7 @@ import { PrismaModule } from './prisma.module';
     { provide: COLUMN_REPOSITORY_TOKEN, useClass: PrismaColumnRepository },
     { provide: CARD_REPOSITORY_TOKEN, useClass: PrismaCardRepository },
     { provide: LABEL_REPOSITORY_TOKEN, useClass: PrismaLabelRepository },
+    { provide: COMMENT_REPOSITORY_TOKEN, useClass: PrismaCommentRepository },
   ],
   exports: [
     USER_REPOSITORY_TOKEN,
@@ -31,6 +34,7 @@ import { PrismaModule } from './prisma.module';
     COLUMN_REPOSITORY_TOKEN,
     CARD_REPOSITORY_TOKEN,
     LABEL_REPOSITORY_TOKEN,
+    COMMENT_REPOSITORY_TOKEN,
   ],
 })
 export class RepositoriesModule {}
