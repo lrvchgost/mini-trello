@@ -8,3 +8,4 @@ export * from './label';
 export * from './comment';
 export * from './activity';
 export * from './search';
+export * from './dashboard';
