@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type {
+  boardListQuerySchema,
   boardSchema,
   boardWithColumnsSchema,
   createBoardSchema,
@@ -10,3 +11,4 @@ export type Board = z.infer<typeof boardSchema>;
 export type BoardWithColumns = z.infer<typeof boardWithColumnsSchema>;
 export type CreateBoardInput = z.infer<typeof createBoardSchema>;
 export type UpdateBoardInput = z.infer<typeof updateBoardSchema>;
+export type BoardListQuery = z.infer<typeof boardListQuerySchema>;

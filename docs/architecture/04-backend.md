@@ -116,7 +116,8 @@ apps/backend/src/
 export const BOARD_REPOSITORY_TOKEN = 'BOARD_REPOSITORY';
 
 export interface IBoardRepository {
-  findById(id: string): Promise<Board | null>;
+  findById(id: string): Promise<Board | null>;                                  // для guard (owner + id)
+  findByIdWithColumns(id: string): Promise<BoardWithColumns | null>;            // деталь доски
   findByOwner(ownerId: string, page?: number, limit?: number, search?: string): Promise<Paginated<Board>>;
   create(data: { title: string; ownerId: string }): Promise<Board>;
   update(id: string, data: { title?: string }): Promise<Board>;
@@ -146,7 +147,7 @@ export interface ICardRepository {
 export class PrismaBoardRepository implements IBoardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findById(id: string) {
+  async findByIdWithColumns(id: string) {
     return this.prisma.board.findUnique({
       where: { id },
       include: { columns: { include: { cards: { orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } } },

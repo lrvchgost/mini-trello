@@ -8,6 +8,7 @@ describe('Repository DI (no Prisma required)', () => {
   it('replaces a repository token with a mock', async () => {
     const mock: jest.Mocked<IBoardRepository> = {
       findById: jest.fn(),
+      findByIdWithColumns: jest.fn(),
       findByOwner: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),

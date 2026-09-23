@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { columnWithCardsSchema } from './column';
-import { idSchema } from './common';
+import { idSchema, paginationQuerySchema } from './common';
 
 export const boardSchema = z.object({
   id: idSchema,
@@ -20,4 +20,8 @@ export const createBoardSchema = z.object({
 
 export const updateBoardSchema = z.object({
   title: z.string().min(1).max(200).optional(),
+});
+
+export const boardListQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).max(200).optional(),
 });
