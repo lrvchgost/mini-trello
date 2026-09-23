@@ -45,7 +45,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const session = await api.post('auth/register', { json: input }).json<AuthResponse>();
       setAccessToken(session.accessToken);
-      set({ user: session.user, status: 'authenticated', error: null });
+      // register already set the refresh cookie, so the session can be hydrated from the server.
+      const user = await api.get('auth/me').json<User>();
+      set({ user, status: 'authenticated', error: null });
     } catch (error) {
       clearAccessToken();
       set({ user: null, status: 'unauthenticated', error: extractErrorMessage(error) });

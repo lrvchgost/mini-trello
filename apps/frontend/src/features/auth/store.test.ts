@@ -70,6 +70,40 @@ describe('useAuthStore', () => {
     expect(useAuthStore.getState().error).toBe('Invalid credentials');
   });
 
+  it('register stores the token and hydrates the user from /auth/me', async () => {
+    mocks.api.post.mockReturnValue(mockJson({ user, accessToken: 'access-1' }));
+    mocks.api.get.mockReturnValue(mockJson(user));
+
+    await useAuthStore
+      .getState()
+      .register({ name: 'Alice', email: user.email, password: 'password123' });
+
+    expect(mocks.api.post).toHaveBeenCalledWith('auth/register', {
+      json: { name: 'Alice', email: user.email, password: 'password123' },
+    });
+    expect(getAccessToken()).toBe('access-1');
+    expect(mocks.api.get).toHaveBeenCalledWith('auth/me');
+    expect(useAuthStore.getState().status).toBe('authenticated');
+    expect(useAuthStore.getState().user?.id).toBe('user-1');
+  });
+
+  it('register drops the session when hydration fails', async () => {
+    mocks.api.post.mockReturnValue(mockJson({ user, accessToken: 'access-1' }));
+    mocks.api.get.mockReturnValue({
+      json: vi.fn().mockRejectedValue(new Error('Unauthorized')),
+    });
+
+    await expect(
+      useAuthStore
+        .getState()
+        .register({ name: 'Alice', email: user.email, password: 'password123' }),
+    ).rejects.toThrow('Unauthorized');
+
+    expect(getAccessToken()).toBeNull();
+    expect(useAuthStore.getState().status).toBe('unauthenticated');
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
   it('logout revokes the session and clears local state', async () => {
     setAccessToken('access-1');
     useAuthStore.setState({ user, status: 'authenticated' });

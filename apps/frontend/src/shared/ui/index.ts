@@ -1,5 +1,16 @@
 export { Button, buttonVariants, type ButtonProps } from './button';
 export { Input } from './input';
+export { Label } from './label';
+export {
+  useFormField,
+  Form,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  FormField,
+} from './form';
 export { Badge, badgeVariants, type BadgeProps } from './badge';
 export {
   Card,
