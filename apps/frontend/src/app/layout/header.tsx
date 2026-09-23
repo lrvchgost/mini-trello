@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu';
+import { Logo } from './logo';
 import { ThemeToggle } from './theme-toggle';
 
 export function Header() {
@@ -25,10 +26,8 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="grid size-6 place-items-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
-            m
-          </span>
-          min-trello
+          <Logo className="size-7" />
+          Blueberry
         </Link>
 
         <div className="ml-auto flex items-center gap-2">

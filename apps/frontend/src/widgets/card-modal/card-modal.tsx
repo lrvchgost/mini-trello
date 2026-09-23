@@ -32,7 +32,7 @@ export function CardModal() {
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[96rem]">
         <DialogTitle className="sr-only">{card ? card.title : 'Карточка'}</DialogTitle>
         <DialogDescription className="sr-only">
           Редактирование карточки, метки, исполнитель и комментарии
