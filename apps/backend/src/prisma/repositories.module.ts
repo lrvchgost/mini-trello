@@ -3,6 +3,8 @@ import { REFRESH_TOKEN_REPOSITORY_TOKEN } from '../auth/repositories/refresh-tok
 import { PrismaRefreshTokenRepository } from '../auth/repositories/prisma-refresh-token.repository';
 import { BOARD_REPOSITORY_TOKEN } from '../boards/repositories/board.repository';
 import { PrismaBoardRepository } from '../boards/repositories/prisma-board.repository';
+import { CARD_REPOSITORY_TOKEN } from '../cards/repositories/card.repository';
+import { PrismaCardRepository } from '../cards/repositories/prisma-card.repository';
 import { COLUMN_REPOSITORY_TOKEN } from '../columns/repositories/column.repository';
 import { PrismaColumnRepository } from '../columns/repositories/prisma-column.repository';
 import { USER_REPOSITORY_TOKEN } from '../users/repositories/user.repository';
@@ -17,12 +19,14 @@ import { PrismaModule } from './prisma.module';
     { provide: REFRESH_TOKEN_REPOSITORY_TOKEN, useClass: PrismaRefreshTokenRepository },
     { provide: BOARD_REPOSITORY_TOKEN, useClass: PrismaBoardRepository },
     { provide: COLUMN_REPOSITORY_TOKEN, useClass: PrismaColumnRepository },
+    { provide: CARD_REPOSITORY_TOKEN, useClass: PrismaCardRepository },
   ],
   exports: [
     USER_REPOSITORY_TOKEN,
     REFRESH_TOKEN_REPOSITORY_TOKEN,
     BOARD_REPOSITORY_TOKEN,
     COLUMN_REPOSITORY_TOKEN,
+    CARD_REPOSITORY_TOKEN,
   ],
 })
 export class RepositoriesModule {}

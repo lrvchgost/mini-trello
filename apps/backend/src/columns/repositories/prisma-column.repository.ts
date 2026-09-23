@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { Column } from '@min-trello/shared';
 import { isUniqueConstraintError } from '../../common/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
-import { placeAtEnd } from '../order.util';
+import { placeAtEnd } from '../../common/order.util';
 import type { IColumnRepository } from './column.repository';
 
 const MAX_ORDER_ATTEMPTS = 5;

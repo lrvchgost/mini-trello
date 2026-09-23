@@ -2,6 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Board } from '@min-trello/shared';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import {
+  CARD_REPOSITORY_TOKEN,
+  type ICardRepository,
+} from '../../cards/repositories/card.repository';
+import {
   COLUMN_REPOSITORY_TOKEN,
   type IColumnRepository,
 } from '../../columns/repositories/column.repository';
@@ -32,12 +36,14 @@ export class BoardAccessResolver {
   constructor(
     @Inject(COLUMN_REPOSITORY_TOKEN)
     private readonly columns: IColumnRepository,
+    @Inject(CARD_REPOSITORY_TOKEN)
+    private readonly cards: ICardRepository,
   ) {}
 
   /**
    * Возвращает `boardId` ресурса из запроса либо `null`, если маршрут не привязан
-   * к конкретной доске (например, список/создание досок). Ресурсы `card`/`comment`/
-   * `label` подключаются по мере появления их репозиториев (шаги 2.3–2.5).
+   * к конкретной доске (например, список/создание досок). Ресурсы `comment`/`label`
+   * подключаются по мере появления их репозиториев (шаги 2.4–2.5).
    */
   async resolveBoardId(req: BoardRequest): Promise<string | null> {
     const route = normalizeRoutePath(req.route?.path ?? req.path);
@@ -55,6 +61,22 @@ export class BoardAccessResolver {
       return this.resolveColumnBoard(req.params.id);
     }
 
+    if (route === '/columns/:columnId/cards' && method === 'POST') {
+      return this.resolveColumnBoard(req.params.columnId);
+    }
+
+    if (route === '/cards/:id' && (method === 'GET' || method === 'PATCH' || method === 'DELETE')) {
+      return this.resolveCardBoard(req.params.id);
+    }
+
+    if (route === '/cards/:id/move' && method === 'PATCH') {
+      return this.resolveCardBoard(req.params.id);
+    }
+
+    if (route === '/cards/:id/assignee' && method === 'PATCH') {
+      return this.resolveCardBoard(req.params.id);
+    }
+
     return null;
   }
 
@@ -64,5 +86,16 @@ export class BoardAccessResolver {
     }
     const column = await this.columns.findById(columnId);
     return column?.boardId ?? null;
+  }
+
+  private async resolveCardBoard(cardId?: string): Promise<string | null> {
+    if (!cardId) {
+      return null;
+    }
+    const card = await this.cards.findById(cardId);
+    if (!card) {
+      return null;
+    }
+    return this.resolveColumnBoard(card.columnId);
   }
 }
