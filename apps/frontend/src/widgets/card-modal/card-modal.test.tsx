@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestQueryClient } from '@/test/query-wrapper';
 import { CardModal } from './card-modal';
@@ -91,13 +91,18 @@ function jsonResponse<T>(value: T) {
   return { json: vi.fn().mockResolvedValue(value) };
 }
 
-function renderModal() {
+function BoardStub() {
+  const location = useLocation();
+  return <div>Board page {location.search}</div>;
+}
+
+function renderModal(search = '') {
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
-      <MemoryRouter initialEntries={[`/boards/${boardId}/cards/${cardId}`]}>
+      <MemoryRouter initialEntries={[`/boards/${boardId}/cards/${cardId}${search}`]}>
         <Routes>
           <Route path="/boards/:id/cards/:cardId" element={<CardModal />} />
-          <Route path="/boards/:id" element={<div>Board page</div>} />
+          <Route path="/boards/:id" element={<BoardStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -160,6 +165,15 @@ describe('CardModal', () => {
     await screen.findByDisplayValue('Карточка');
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
 
-    expect(await screen.findByText('Board page')).toBeInTheDocument();
+    expect(await screen.findByText(/Board page/)).toBeInTheDocument();
+  });
+
+  it('preserves active filters in the URL when closing', async () => {
+    renderModal('?q=fix&priority=high');
+
+    await screen.findByDisplayValue('Карточка');
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
+
+    expect(await screen.findByText(/Board page/)).toHaveTextContent('q=fix&priority=high');
   });
 });

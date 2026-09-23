@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { cardQueryKeys, useCardQuery } from '@/entities/card';
 import { AssigneeSelect } from '@/features/cards';
 import { CommentSection } from '@/features/comments';
@@ -13,6 +13,7 @@ import { CardForm } from './card-form';
 export function CardModal() {
   const { id: boardId = '', cardId = '' } = useParams<{ id: string; cardId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: card, isPending, isError, error } = useCardQuery(cardId);
 
@@ -20,7 +21,8 @@ export function CardModal() {
   const notFound = isError && extractApiError(error).status === 404;
 
   function close() {
-    navigate(boardHref);
+    // Preserve the active board filters (query string) when returning to the board.
+    navigate({ pathname: boardHref, search: location.search });
   }
 
   return (

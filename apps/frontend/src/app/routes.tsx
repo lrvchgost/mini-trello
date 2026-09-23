@@ -4,6 +4,7 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { LoginPage } from '@/pages/login/LoginPage';
 import { NotFoundPage } from '@/pages/not-found/NotFoundPage';
 import { RegisterPage } from '@/pages/register/RegisterPage';
+import { SearchPage } from '@/pages/search/SearchPage';
 import { ProtectedRoute } from '@/shared/ui/protected-route';
 import { PublicOnlyRoute } from '@/shared/ui/public-only-route';
 import { CardModal } from '@/widgets/card-modal';
@@ -23,6 +24,7 @@ export function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/boards/:id" element={<BoardPage />}>
             <Route path="cards/:cardId" element={<CardModal />} />
           </Route>

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOutIcon, UserIcon } from 'lucide-react';
+import { LogOutIcon, SearchIcon, UserIcon } from 'lucide-react';
 import { useAuth } from '@/features/auth/useAuth';
 import { Button } from '@/shared/ui/button';
 import {
@@ -31,6 +31,12 @@ export function Header() {
         </Link>
 
         <div className="ml-auto flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="gap-2">
+            <Link to="/search">
+              <SearchIcon />
+              <span className="hidden sm:inline">Поиск</span>
+            </Link>
+          </Button>
           <ThemeToggle />
           {user ? (
             <DropdownMenu>
