@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaClient, Priority } from '@prisma/client';
 import { BCRYPT_ROUNDS } from '../src/auth/auth.constants';
@@ -159,12 +160,23 @@ function columnIndexFor(cardIndex: number): number {
   return COLUMN_DISTRIBUTION.length - 1;
 }
 
-const userId = (key: string): string => `seed-user-${key}`;
-const boardId = (userKey: string, boardKey: string): string => `seed-board-${userKey}-${boardKey}`;
-const columnId = (board: string, columnKey: string): string => `seed-column-${board}-${columnKey}`;
-const labelId = (board: string, labelKey: string): string => `seed-label-${board}-${labelKey}`;
-const cardId = (board: string, index: number): string => `seed-card-${board}-${index}`;
-const commentId = (card: string, index: number): string => `seed-comment-${card}-${index}`;
+/**
+ * Deterministic ids in the CUID format expected by the shared `idSchema`
+ * (`c` + 24 lowercase alphanumerics, no hyphens/spaces).
+ */
+function seedId(scope: string): string {
+  const digest = createHash('sha256').update(scope).digest('hex');
+  return `c${digest.slice(0, 24)}`;
+}
+
+const userId = (key: string): string => seedId(`user-${key}`);
+const boardId = (userKey: string, boardKey: string): string =>
+  seedId(`board-${userKey}-${boardKey}`);
+const columnId = (board: string, columnKey: string): string =>
+  seedId(`column-${board}-${columnKey}`);
+const labelId = (board: string, labelKey: string): string => seedId(`label-${board}-${labelKey}`);
+const cardId = (board: string, index: number): string => seedId(`card-${board}-${index}`);
+const commentId = (card: string, index: number): string => seedId(`comment-${card}-${index}`);
 
 async function seedUser(user: SeedUser, userIndex: number, now: number, passwordHash: string) {
   const createdAt = new Date(now - (200 - userIndex * 40) * DAY_MS);
