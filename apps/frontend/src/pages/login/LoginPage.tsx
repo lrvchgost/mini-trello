@@ -19,12 +19,14 @@ import { Input } from '@/shared/ui/input';
 
 interface LocationState {
   from?: string;
+  notice?: string;
 }
 
 export function LoginPage() {
   const { login, status } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const state = location.state as LocationState | null;
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema, { errorMap: ruZodErrorMap }),
     defaultValues: { email: '', password: '' },
@@ -36,8 +38,7 @@ export function LoginPage() {
     form.clearErrors('root');
     try {
       await login(values);
-      const from = (location.state as LocationState | null)?.from ?? '/dashboard';
-      navigate(from, { replace: true });
+      navigate(state?.from ?? '/dashboard', { replace: true });
     } catch (error) {
       applyServerErrors(form.setError, error);
     }
@@ -50,6 +51,11 @@ export function LoginPage() {
         <CardDescription>Войдите, чтобы продолжить работу с досками.</CardDescription>
       </CardHeader>
       <CardContent>
+        {state?.notice ? (
+          <p role="status" className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">
+            {state.notice}
+          </p>
+        ) : null}
         <Form {...form}>
           <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FormField

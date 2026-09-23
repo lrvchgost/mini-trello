@@ -9,8 +9,20 @@ export function useAuth() {
   const register = useAuthStore((state) => state.register);
   const logout = useAuthStore((state) => state.logout);
   const bootstrap = useAuthStore((state) => state.bootstrap);
+  const updateProfile = useAuthStore((state) => state.updateProfile);
+  const changePassword = useAuthStore((state) => state.changePassword);
 
-  return { user, status, error, login, register, logout, bootstrap };
+  return {
+    user,
+    status,
+    error,
+    login,
+    register,
+    logout,
+    bootstrap,
+    updateProfile,
+    changePassword,
+  };
 }
 
 /** Restores the session once on app start (`/auth/refresh` then `/auth/me`). */

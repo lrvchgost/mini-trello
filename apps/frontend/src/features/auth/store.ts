@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { AuthResponse, LoginInput, RegisterInput, User } from '@min-trello/shared';
+import type {
+  AuthResponse,
+  ChangePasswordInput,
+  LoginInput,
+  RegisterInput,
+  UpdateProfileInput,
+  User,
+} from '@min-trello/shared';
 import { api, setUnauthorizedHandler } from '@/shared/api/ky-client';
 import { refreshAccessToken } from '@/shared/api/refresh';
 import { clearAccessToken, setAccessToken } from '@/shared/api/token-store';
@@ -16,6 +23,8 @@ export interface AuthState {
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   bootstrap: () => Promise<void>;
+  updateProfile: (input: UpdateProfileInput) => Promise<User>;
+  changePassword: (input: ChangePasswordInput) => Promise<void>;
   forgetSession: () => void;
 }
 
@@ -77,6 +86,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       clearAccessToken();
       set({ user: null, status: 'unauthenticated', error: null });
     }
+  },
+
+  updateProfile: async (input) => {
+    const user = await api.patch('users/me', { json: input }).json<User>();
+    set({ user });
+    return user;
+  },
+
+  changePassword: async (input) => {
+    // The server revokes every refresh token, so the session must be re-established by login.
+    await api.patch('users/me/password', { json: input });
   },
 
   forgetSession: () => {

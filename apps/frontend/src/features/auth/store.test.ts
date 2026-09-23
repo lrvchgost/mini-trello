@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
+    patch: vi.fn(),
   },
   refreshAccessToken: vi.fn(),
   setUnauthorizedHandler: vi.fn(),
@@ -38,6 +39,7 @@ describe('useAuthStore', () => {
   beforeEach(() => {
     mocks.api.get.mockReset();
     mocks.api.post.mockReset();
+    mocks.api.patch.mockReset();
     mocks.refreshAccessToken.mockReset();
     clearAccessToken();
     useAuthStore.setState(initialAuthState);
@@ -137,5 +139,29 @@ describe('useAuthStore', () => {
     expect(useAuthStore.getState().status).toBe('unauthenticated');
     expect(useAuthStore.getState().user).toBeNull();
     expect(mocks.api.get).not.toHaveBeenCalled();
+  });
+
+  it('updateProfile patches the name and refreshes the stored user', async () => {
+    useAuthStore.setState({ user, status: 'authenticated' });
+    const updated = { ...user, name: 'Alicia' };
+    mocks.api.patch.mockReturnValue(mockJson(updated));
+
+    const result = await useAuthStore.getState().updateProfile({ name: 'Alicia' });
+
+    expect(mocks.api.patch).toHaveBeenCalledWith('users/me', { json: { name: 'Alicia' } });
+    expect(result.name).toBe('Alicia');
+    expect(useAuthStore.getState().user?.name).toBe('Alicia');
+  });
+
+  it('changePassword patches the password endpoint', async () => {
+    mocks.api.patch.mockResolvedValue(undefined);
+
+    await useAuthStore
+      .getState()
+      .changePassword({ oldPassword: 'password123', newPassword: 'newpassword123' });
+
+    expect(mocks.api.patch).toHaveBeenCalledWith('users/me/password', {
+      json: { oldPassword: 'password123', newPassword: 'newpassword123' },
+    });
   });
 });

@@ -3,6 +3,7 @@ import { BoardPage } from '@/pages/board/BoardPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { LoginPage } from '@/pages/login/LoginPage';
 import { NotFoundPage } from '@/pages/not-found/NotFoundPage';
+import { ProfilePage } from '@/pages/profile/ProfilePage';
 import { RegisterPage } from '@/pages/register/RegisterPage';
 import { SearchPage } from '@/pages/search/SearchPage';
 import { ProtectedRoute } from '@/shared/ui/protected-route';
@@ -25,6 +26,7 @@ export function AppRoutes() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/boards/:id" element={<BoardPage />}>
             <Route path="cards/:cardId" element={<CardModal />} />
           </Route>

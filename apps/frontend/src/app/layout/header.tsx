@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOutIcon, SearchIcon, UserIcon } from 'lucide-react';
+import { LogOutIcon, SearchIcon, SettingsIcon, UserIcon } from 'lucide-react';
 import { useAuth } from '@/features/auth/useAuth';
 import { Button } from '@/shared/ui/button';
 import {
@@ -54,6 +54,12 @@ export function Header() {
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/profile">
+                    <SettingsIcon />
+                    Профиль
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onSelect={() => void handleLogout()}>
                   <LogOutIcon />
                   Выйти
