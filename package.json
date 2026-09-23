@@ -23,6 +23,8 @@
     "db:migrate": "pnpm --filter @min-trello/backend db:migrate",
     "db:deploy": "pnpm --filter @min-trello/backend db:deploy",
     "db:reset": "pnpm --filter @min-trello/backend db:reset",
+    "db:seed": "pnpm --filter @min-trello/backend db:seed",
+    "test:seed": "pnpm --filter @min-trello/backend test:seed",
     "prepare": "husky"
   },
   "devDependencies": {
