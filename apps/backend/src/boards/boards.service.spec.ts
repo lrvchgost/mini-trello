@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import type { Board, BoardWithColumns } from '@min-trello/shared';
 import type { ActivityService } from '../activity/activity.service';
+import type { BoardsGateway } from './boards.gateway';
 import type { IBoardRepository } from './repositories/board.repository';
 import { BoardsService } from './boards.service';
 
@@ -18,6 +19,7 @@ describe('BoardsService', () => {
   let service: BoardsService;
   let boardRepo: jest.Mocked<IBoardRepository>;
   let activityService: jest.Mocked<ActivityService>;
+  let boardsGateway: jest.Mocked<BoardsGateway>;
 
   beforeEach(() => {
     boardRepo = {
@@ -33,7 +35,11 @@ describe('BoardsService', () => {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as jest.Mocked<ActivityService>;
 
-    service = new BoardsService(boardRepo, activityService);
+    boardsGateway = {
+      emitBoardUpdated: jest.fn(),
+    } as unknown as jest.Mocked<BoardsGateway>;
+
+    service = new BoardsService(boardRepo, activityService, boardsGateway);
   });
 
   describe('list', () => {
@@ -60,6 +66,7 @@ describe('BoardsService', () => {
         { title: 'My Board' },
         'user-1',
       );
+      expect(boardsGateway.emitBoardUpdated).not.toHaveBeenCalled();
     });
   });
 
@@ -78,13 +85,13 @@ describe('BoardsService', () => {
   });
 
   describe('update', () => {
-    it('updates the board title and logs activity', async () => {
+    it('updates the board, logs activity and emits board.updated', async () => {
       const updated = { ...board, title: 'Renamed' };
       boardRepo.update.mockResolvedValue(updated);
 
-      await expect(service.update('board-1', { title: 'Renamed' }, 'user-1')).resolves.toBe(
-        updated,
-      );
+      await expect(
+        service.update('board-1', { title: 'Renamed' }, 'user-1', 'tab-1'),
+      ).resolves.toBe(updated);
       expect(boardRepo.update).toHaveBeenCalledWith('board-1', { title: 'Renamed' });
       expect(activityService.log).toHaveBeenCalledWith(
         'board-1',
@@ -92,6 +99,11 @@ describe('BoardsService', () => {
         { changes: { title: 'Renamed' } },
         'user-1',
       );
+      expect(boardsGateway.emitBoardUpdated).toHaveBeenCalledWith({
+        board: updated,
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
   });
 

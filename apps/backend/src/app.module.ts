@@ -19,6 +19,7 @@ import { AppConfigModule } from './config/config.module';
 import { LabelsModule } from './labels/labels.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RepositoriesModule } from './prisma/repositories.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { SearchModule } from './search/search.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     RedisModule,
+    RealtimeModule,
     RepositoriesModule,
     BoardAccessModule,
     ActivityModule,

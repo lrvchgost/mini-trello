@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { ActivityAction, Comment, CreateCommentInput, Paginated } from '@min-trello/shared';
 import { ActivityService } from '../activity/activity.service';
+import { CardsGateway } from '../cards/cards.gateway';
 import { ErrorCode } from '../common/errors';
 import { CARD_REPOSITORY_TOKEN, type ICardRepository } from '../cards/repositories/card.repository';
 import {
@@ -16,6 +17,7 @@ export class CommentsService {
     @Inject(CARD_REPOSITORY_TOKEN)
     private readonly cardRepo: ICardRepository,
     private readonly activityService: ActivityService,
+    private readonly cardsGateway: CardsGateway,
   ) {}
 
   async list(cardId: string, page: number, limit: number): Promise<Paginated<Comment>> {
@@ -28,6 +30,7 @@ export class CommentsService {
     input: CreateCommentInput,
     authorId: string,
     boardId?: string,
+    clientId?: string | null,
   ): Promise<Comment> {
     await this.ensureCard(cardId);
     const comment = await this.commentRepo.create({
@@ -42,6 +45,9 @@ export class CommentsService {
       authorId,
       cardId,
     );
+    if (boardId) {
+      this.cardsGateway.emitCommentCreated(boardId, { comment, actorId: authorId, clientId });
+    }
     return comment;
   }
 

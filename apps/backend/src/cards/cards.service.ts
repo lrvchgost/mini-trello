@@ -20,6 +20,7 @@ import {
   COLUMN_REPOSITORY_TOKEN,
   type IColumnRepository,
 } from '../columns/repositories/column.repository';
+import { CardsGateway } from './cards.gateway';
 import { CARD_REPOSITORY_TOKEN, type ICardRepository } from './repositories/card.repository';
 
 export interface MoveCardResult {
@@ -35,6 +36,7 @@ export class CardsService {
     @Inject(COLUMN_REPOSITORY_TOKEN)
     private readonly columnRepo: IColumnRepository,
     private readonly activityService: ActivityService,
+    private readonly cardsGateway: CardsGateway,
   ) {}
 
   async create(
@@ -42,6 +44,7 @@ export class CardsService {
     input: CreateCardInput,
     actorId: string,
     boardId?: string,
+    clientId?: string | null,
   ): Promise<Card> {
     const card = await this.cardRepo.create({ ...input, columnId });
     await this.logActivity(
@@ -51,6 +54,9 @@ export class CardsService {
       actorId,
       card.id,
     );
+    if (boardId) {
+      this.cardsGateway.emitCardCreated(boardId, { card, actorId, clientId });
+    }
     return card;
   }
 
@@ -67,6 +73,7 @@ export class CardsService {
     input: UpdateCardInput,
     actorId: string,
     boardId?: string,
+    clientId?: string | null,
   ): Promise<Card> {
     await this.ensureExists(id);
 
@@ -85,6 +92,9 @@ export class CardsService {
       actorId,
       card.id,
     );
+    if (boardId) {
+      this.cardsGateway.emitCardUpdated(boardId, { card, actorId, clientId });
+    }
     return card;
   }
 
@@ -93,6 +103,7 @@ export class CardsService {
     input: MoveCardInput,
     actorId: string,
     boardId?: string,
+    clientId?: string | null,
   ): Promise<MoveCardResult> {
     await this.ensureExists(id);
 
@@ -112,6 +123,15 @@ export class CardsService {
       actorId,
       card.id,
     );
+    if (boardId) {
+      this.cardsGateway.emitCardMoved(boardId, {
+        cardId: card.id,
+        targetColumnId: card.columnId,
+        newOrder: card.order,
+        actorId,
+        clientId,
+      });
+    }
     return { columnId: card.columnId, order: card.order };
   }
 
@@ -120,6 +140,7 @@ export class CardsService {
     input: AssignCardInput,
     actorId: string,
     boardId?: string,
+    clientId?: string | null,
   ): Promise<Card> {
     if (input.assigneeId !== null && input.assigneeId !== actorId) {
       throw new UnprocessableEntityException({
@@ -137,13 +158,24 @@ export class CardsService {
       actorId,
       card.id,
     );
+    if (boardId) {
+      this.cardsGateway.emitCardUpdated(boardId, { card, actorId, clientId });
+    }
     return card;
   }
 
-  async remove(id: string, actorId: string, boardId?: string): Promise<void> {
+  async remove(
+    id: string,
+    actorId: string,
+    boardId?: string,
+    clientId?: string | null,
+  ): Promise<void> {
     await this.ensureExists(id);
     await this.cardRepo.remove(id);
     await this.logActivity(boardId, 'card.deleted', { cardId: id }, actorId);
+    if (boardId) {
+      this.cardsGateway.emitCardDeleted(boardId, { cardId: id, actorId, clientId });
+    }
   }
 
   private async logActivity(

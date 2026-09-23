@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Board, Comment, Paginated } from '@min-trello/shared';
+import { ClientId } from '../common/decorators/client-id.decorator';
 import { CurrentBoard } from '../common/decorators/current-board.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { BoardAccessGuard } from '../common/guards/board-access.guard';
@@ -41,8 +42,9 @@ export class CommentsController {
     @Body() dto: CreateCommentDto,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentBoard() board?: Board,
+    @ClientId() clientId?: string | null,
   ): Promise<Comment> {
-    return this.commentsService.create(cardId, dto, user.id, board?.id);
+    return this.commentsService.create(cardId, dto, user.id, board?.id, clientId);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

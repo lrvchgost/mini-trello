@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Board, Card, CardDetail } from '@min-trello/shared';
+import { ClientId } from '../common/decorators/client-id.decorator';
 import { CurrentBoard } from '../common/decorators/current-board.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { BoardAccessGuard } from '../common/guards/board-access.guard';
@@ -35,8 +36,9 @@ export class CardsController {
     @Body() dto: CreateCardDto,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentBoard() board?: Board,
+    @ClientId() clientId?: string | null,
   ): Promise<Card> {
-    return this.cardsService.create(columnId, dto, user.id, board?.id);
+    return this.cardsService.create(columnId, dto, user.id, board?.id, clientId);
   }
 
   @Get('cards/:id')
@@ -50,8 +52,9 @@ export class CardsController {
     @Body() dto: UpdateCardDto,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentBoard() board?: Board,
+    @ClientId() clientId?: string | null,
   ): Promise<Card> {
-    return this.cardsService.update(id, dto, user.id, board?.id);
+    return this.cardsService.update(id, dto, user.id, board?.id, clientId);
   }
 
   @Patch('cards/:id/move')
@@ -60,8 +63,9 @@ export class CardsController {
     @Body() dto: MoveCardDto,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentBoard() board?: Board,
+    @ClientId() clientId?: string | null,
   ): Promise<MoveCardResult> {
-    return this.cardsService.move(id, dto, user.id, board?.id);
+    return this.cardsService.move(id, dto, user.id, board?.id, clientId);
   }
 
   @Patch('cards/:id/assignee')
@@ -70,8 +74,9 @@ export class CardsController {
     @Body() dto: AssignCardDto,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentBoard() board?: Board,
+    @ClientId() clientId?: string | null,
   ): Promise<Card> {
-    return this.cardsService.assign(id, dto, user.id, board?.id);
+    return this.cardsService.assign(id, dto, user.id, board?.id, clientId);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -80,7 +85,8 @@ export class CardsController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentBoard() board?: Board,
+    @ClientId() clientId?: string | null,
   ): Promise<void> {
-    return this.cardsService.remove(id, user.id, board?.id);
+    return this.cardsService.remove(id, user.id, board?.id, clientId);
   }
 }

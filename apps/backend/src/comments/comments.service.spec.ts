@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { Card, Comment, Paginated } from '@min-trello/shared';
 import type { ActivityService } from '../activity/activity.service';
+import type { CardsGateway } from '../cards/cards.gateway';
 import type { ICardRepository } from '../cards/repositories/card.repository';
 import { CommentsService } from './comments.service';
 import type { ICommentRepository } from './repositories/comment.repository';
@@ -34,6 +35,7 @@ describe('CommentsService', () => {
   let commentRepo: jest.Mocked<ICommentRepository>;
   let cardRepo: jest.Mocked<ICardRepository>;
   let activityService: jest.Mocked<ActivityService>;
+  let cardsGateway: jest.Mocked<CardsGateway>;
 
   beforeEach(() => {
     commentRepo = {
@@ -58,7 +60,11 @@ describe('CommentsService', () => {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as jest.Mocked<ActivityService>;
 
-    service = new CommentsService(commentRepo, cardRepo, activityService);
+    cardsGateway = {
+      emitCommentCreated: jest.fn(),
+    } as unknown as jest.Mocked<CardsGateway>;
+
+    service = new CommentsService(commentRepo, cardRepo, activityService, cardsGateway);
   });
 
   describe('list', () => {
@@ -79,12 +85,12 @@ describe('CommentsService', () => {
   });
 
   describe('create', () => {
-    it('creates a comment authored by the current user and logs activity', async () => {
+    it('creates a comment authored by the current user, logs and emits comment.created', async () => {
       cardRepo.findById.mockResolvedValue(card);
       commentRepo.create.mockResolvedValue(comment);
 
       await expect(
-        service.create('card-1', { content: 'ping' }, 'user-1', 'board-1'),
+        service.create('card-1', { content: 'ping' }, 'user-1', 'board-1', 'tab-1'),
       ).resolves.toBe(comment);
       expect(commentRepo.create).toHaveBeenCalledWith({
         content: 'ping',
@@ -98,6 +104,11 @@ describe('CommentsService', () => {
         'user-1',
         'card-1',
       );
+      expect(cardsGateway.emitCommentCreated).toHaveBeenCalledWith('board-1', {
+        comment,
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
 
     it('throws CARD_NOT_FOUND when the card is missing', async () => {

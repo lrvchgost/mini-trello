@@ -18,12 +18,15 @@ apps/backend/src/
 │   ├── pipes/                  # Zod validation pipe
 │   ├── interceptors/           # Logging interceptor (winston)
 │   ├── guards/                 # JwtAuthGuard, BoardAccessGuard
-│   ├── decorators/             # @CurrentUser()
+│   ├── decorators/             # @CurrentUser(), @ClientId()
 │   ├── resolvers/              # BoardAccessResolver (boardId по ресурсу)
 │   ├── access/                 # BoardAccessModule (@Global): guard + resolver
 │   └── health/                 # HealthController (terminus)
 ├── realtime/
-│   └── ws-auth.middleware.ts   # JWT в handshake Socket.IO
+│   ├── ws-auth.middleware.ts   # JWT в handshake Socket.IO
+│   ├── room.util.ts            # имя комнаты board:{boardId}
+│   ├── realtime.module.ts      # @Global: JwtModule + WsAuthMiddleware
+│   └── redis-io.adapter.ts     # Socket.IO Redis adapter (@socket.io/redis-adapter)
 ├── auth/                 # регистрация, логин, JWT
 │   ├── auth.module.ts
 │   ├── auth.controller.ts
@@ -275,8 +278,12 @@ card.created, card.updated, card.moved, card.deleted, comment.created
 - Комнату покидают в `leaveBoard` и при `disconnect`.
 - Контроллеры читают `X-Client-Id` из мутирующих REST-запросов и передают в сервис; gateway
   кладёт его в payload события (дедуп на клиенте, см. [06-api.md](./06-api.md#2-websocket-socketio)).
-- CORS для dev: `@WebSocketGateway({ cors: { origin: env.CORS_ORIGIN, credentials: true } })`,
-  иначе handshake с `http://localhost:5173` блокируется.
+- CORS: `RedisIoAdapter.createIOServer` выставляет `cors: { origin: env.CORS_ORIGIN,
+  credentials: true }` (env недоступен на этапе статической метадекоратора gateway), иначе
+  handshake с `http://localhost:5173` блокируется.
+- Мультиинстанс: `RedisIoAdapter` (`@socket.io/redis-adapter`) подключается в `main.ts`
+  (`connectToRedis()` + `app.useWebSocketAdapter`) и держит собственные ioredis-соединения,
+  чтобы не конфликтовать с Pub/Sub-подписчиком активности.
 
 ### SSE (activity)
 

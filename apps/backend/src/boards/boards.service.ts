@@ -9,6 +9,7 @@ import type {
 } from '@min-trello/shared';
 import { ActivityService } from '../activity/activity.service';
 import { ErrorCode } from '../common/errors';
+import { BoardsGateway } from './boards.gateway';
 import { BOARD_REPOSITORY_TOKEN, type IBoardRepository } from './repositories/board.repository';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class BoardsService {
     @Inject(BOARD_REPOSITORY_TOKEN)
     private readonly boardRepo: IBoardRepository,
     private readonly activityService: ActivityService,
+    private readonly boardsGateway: BoardsGateway,
   ) {}
 
   list(ownerId: string, query: BoardListQuery): Promise<Paginated<Board>> {
@@ -40,9 +42,15 @@ export class BoardsService {
     return board;
   }
 
-  async update(id: string, input: UpdateBoardInput, actorId: string): Promise<Board> {
+  async update(
+    id: string,
+    input: UpdateBoardInput,
+    actorId: string,
+    clientId?: string | null,
+  ): Promise<Board> {
     const board = await this.boardRepo.update(id, input);
     await this.activityService.log(id, 'board.updated', { changes: input }, actorId);
+    this.boardsGateway.emitBoardUpdated({ board, actorId, clientId });
     return board;
   }
 

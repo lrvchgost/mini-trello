@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException, UnprocessableEntityException } fr
 import type { Card, CardDetail } from '@min-trello/shared';
 import type { ActivityService } from '../activity/activity.service';
 import type { IColumnRepository } from '../columns/repositories/column.repository';
+import type { CardsGateway } from './cards.gateway';
 import { CardsService } from './cards.service';
 import type { ICardRepository } from './repositories/card.repository';
 
@@ -35,6 +36,7 @@ describe('CardsService', () => {
   let cardRepo: jest.Mocked<ICardRepository>;
   let columnRepo: jest.Mocked<IColumnRepository>;
   let activityService: jest.Mocked<ActivityService>;
+  let cardsGateway: jest.Mocked<CardsGateway>;
 
   beforeEach(() => {
     cardRepo = {
@@ -60,11 +62,19 @@ describe('CardsService', () => {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as jest.Mocked<ActivityService>;
 
-    service = new CardsService(cardRepo, columnRepo, activityService);
+    cardsGateway = {
+      emitCardCreated: jest.fn(),
+      emitCardUpdated: jest.fn(),
+      emitCardMoved: jest.fn(),
+      emitCardDeleted: jest.fn(),
+      emitCommentCreated: jest.fn(),
+    } as unknown as jest.Mocked<CardsGateway>;
+
+    service = new CardsService(cardRepo, columnRepo, activityService, cardsGateway);
   });
 
   describe('create', () => {
-    it('creates a card inside the column and logs activity', async () => {
+    it('creates a card inside the column, logs activity and emits card.created', async () => {
       cardRepo.create.mockResolvedValue(card);
 
       await expect(
@@ -73,6 +83,7 @@ describe('CardsService', () => {
           { title: 'First task', priority: 'medium' },
           'user-1',
           'board-1',
+          'tab-1',
         ),
       ).resolves.toBe(card);
       expect(cardRepo.create).toHaveBeenCalledWith({
@@ -87,6 +98,11 @@ describe('CardsService', () => {
         'user-1',
         'card-1',
       );
+      expect(cardsGateway.emitCardCreated).toHaveBeenCalledWith('board-1', {
+        card,
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
   });
 
@@ -105,13 +121,13 @@ describe('CardsService', () => {
   });
 
   describe('update', () => {
-    it('updates the card and logs activity', async () => {
+    it('updates the card, logs activity and emits card.updated', async () => {
       const updated = { ...card, title: 'Renamed' };
       cardRepo.findById.mockResolvedValue(card);
       cardRepo.update.mockResolvedValue(updated);
 
       await expect(
-        service.update('card-1', { title: 'Renamed' }, 'user-1', 'board-1'),
+        service.update('card-1', { title: 'Renamed' }, 'user-1', 'board-1', 'tab-1'),
       ).resolves.toBe(updated);
       expect(activityService.log).toHaveBeenCalledWith(
         'board-1',
@@ -120,6 +136,11 @@ describe('CardsService', () => {
         'user-1',
         'card-1',
       );
+      expect(cardsGateway.emitCardUpdated).toHaveBeenCalledWith('board-1', {
+        card: updated,
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
 
     it('throws CONFLICT when expectedUpdatedAt is stale', async () => {
@@ -130,6 +151,7 @@ describe('CardsService', () => {
         service.update('card-1', { title: 'Renamed' }, 'user-1', 'board-1'),
       ).rejects.toThrow(ConflictException);
       expect(activityService.log).not.toHaveBeenCalled();
+      expect(cardsGateway.emitCardUpdated).not.toHaveBeenCalled();
     });
 
     it('throws CARD_NOT_FOUND when the card is missing', async () => {
@@ -143,13 +165,13 @@ describe('CardsService', () => {
   });
 
   describe('move', () => {
-    it('moves the card, returns its new position and logs activity', async () => {
+    it('moves the card, returns its new position and emits card.moved', async () => {
       cardRepo.findById.mockResolvedValue(card);
       columnRepo.findById.mockResolvedValue(column);
       cardRepo.move.mockResolvedValue({ ...card, columnId: 'column-2', order: 3 });
 
       await expect(
-        service.move('card-1', { columnId: 'column-2', order: 3 }, 'user-1', 'board-1'),
+        service.move('card-1', { columnId: 'column-2', order: 3 }, 'user-1', 'board-1', 'tab-1'),
       ).resolves.toEqual({ columnId: 'column-2', order: 3 });
       expect(cardRepo.move).toHaveBeenCalledWith('card-1', 'column-2', 3);
       expect(activityService.log).toHaveBeenCalledWith(
@@ -159,6 +181,13 @@ describe('CardsService', () => {
         'user-1',
         'card-1',
       );
+      expect(cardsGateway.emitCardMoved).toHaveBeenCalledWith('board-1', {
+        cardId: 'card-1',
+        targetColumnId: 'column-2',
+        newOrder: 3,
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
 
     it('throws COLUMN_NOT_FOUND for a column of another board', async () => {
@@ -190,12 +219,12 @@ describe('CardsService', () => {
   });
 
   describe('assign', () => {
-    it('assigns the board owner and logs activity', async () => {
+    it('assigns the board owner, logs activity and emits card.updated', async () => {
       cardRepo.findById.mockResolvedValue(card);
       cardRepo.setAssignee.mockResolvedValue({ ...card, assigneeId: 'user-1' });
 
       await expect(
-        service.assign('card-1', { assigneeId: 'user-1' }, 'user-1', 'board-1'),
+        service.assign('card-1', { assigneeId: 'user-1' }, 'user-1', 'board-1', 'tab-1'),
       ).resolves.toMatchObject({ assigneeId: 'user-1' });
       expect(activityService.log).toHaveBeenCalledWith(
         'board-1',
@@ -204,6 +233,11 @@ describe('CardsService', () => {
         'user-1',
         'card-1',
       );
+      expect(cardsGateway.emitCardUpdated).toHaveBeenCalledWith('board-1', {
+        card: { ...card, assigneeId: 'user-1' },
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
 
     it('allows clearing the assignee', async () => {
@@ -225,11 +259,11 @@ describe('CardsService', () => {
   });
 
   describe('remove', () => {
-    it('deletes the card and logs activity', async () => {
+    it('deletes the card, logs activity and emits card.deleted', async () => {
       cardRepo.findById.mockResolvedValue(card);
       cardRepo.remove.mockResolvedValue(undefined);
 
-      await service.remove('card-1', 'user-1', 'board-1');
+      await service.remove('card-1', 'user-1', 'board-1', 'tab-1');
       expect(cardRepo.remove).toHaveBeenCalledWith('card-1');
       expect(activityService.log).toHaveBeenCalledWith(
         'board-1',
@@ -238,6 +272,11 @@ describe('CardsService', () => {
         'user-1',
         undefined,
       );
+      expect(cardsGateway.emitCardDeleted).toHaveBeenCalledWith('board-1', {
+        cardId: 'card-1',
+        actorId: 'user-1',
+        clientId: 'tab-1',
+      });
     });
 
     it('throws CARD_NOT_FOUND when the card is missing', async () => {

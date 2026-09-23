@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Board, BoardWithColumns, Paginated } from '@min-trello/shared';
+import { ClientId } from '../common/decorators/client-id.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { BoardAccessGuard } from '../common/guards/board-access.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -51,8 +52,9 @@ export class BoardsController {
     @Param('id') id: string,
     @Body() dto: UpdateBoardDto,
     @CurrentUser() user: AuthenticatedUser,
+    @ClientId() clientId: string | null,
   ): Promise<Board> {
-    return this.boardsService.update(id, dto, user.id);
+    return this.boardsService.update(id, dto, user.id, clientId);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
