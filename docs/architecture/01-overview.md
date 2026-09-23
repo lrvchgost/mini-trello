@@ -24,7 +24,7 @@
 | **Markdown (render)** | react-markdown + remark-gfm | Отображение |
 | **Unit tests (FE)** | Vitest + @testing-library/react | Компонентные тесты |
 | **E2E** | Playwright | Интеграционные тесты |
-| **Storybook** | Storybook 8 | Изолированная разработка UI |
+| **Storybook** | Storybook 10 | Изолированная разработка UI |
 | **Framework (BE)** | NestJS | Сервер |
 | **ORM** | Prisma | Доступ к БД, миграции |
 | **Auth** | @nestjs/passport + JWT | Регистрация, логин |

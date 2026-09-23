@@ -25,7 +25,9 @@
     "db:reset": "pnpm --filter @min-trello/backend db:reset",
     "db:seed": "pnpm --filter @min-trello/backend db:seed",
     "test:seed": "pnpm --filter @min-trello/backend test:seed",
-    "prepare": "husky"
+    "prepare": "husky",
+    "storybook": "pnpm --filter @min-trello/frontend storybook",
+    "build-storybook": "pnpm --filter @min-trello/frontend build-storybook"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
