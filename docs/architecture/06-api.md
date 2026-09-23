@@ -85,7 +85,7 @@ httpOnly/Secure/SameSite=Lax cookie (см. [ADR-004](../decisions/adr-004-auth-t
 
 | Method | Path | Ответ | Описание |
 |--------|------|-------|----------|
-| GET | `/api/boards` | `200 Paginated<Board>` | Список досок (`?page&limit&search`) |
+| GET | `/api/boards` | `200 Paginated<BoardListItem>` | Список доск (`?page&limit&search`); `BoardListItem = Board + cardsCount` (число карточек в доске) |
 | POST | `/api/boards` | `201 Board` | Создать доску |
 | GET | `/api/boards/:id` | `200 Board` | Доска с колонками и карточками |
 | PATCH | `/api/boards/:id` | `200 Board` | Обновить доску |

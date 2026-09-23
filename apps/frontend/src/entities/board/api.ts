@@ -1,8 +1,10 @@
 import {
+  boardListItemSchema,
   boardSchema,
   boardWithColumnsSchema,
   paginated,
   type Board,
+  type BoardListItem,
   type BoardListQuery,
   type BoardWithColumns,
   type CreateBoardInput,
@@ -12,9 +14,9 @@ import { api } from '@/shared/api/ky-client';
 
 export type BoardListParams = Pick<BoardListQuery, 'page' | 'limit'>;
 
-const paginatedBoardsSchema = paginated(boardSchema);
+const paginatedBoardsSchema = paginated(boardListItemSchema);
 
-export async function fetchBoards(params: BoardListParams): Promise<Paginated<Board>> {
+export async function fetchBoards(params: BoardListParams): Promise<Paginated<BoardListItem>> {
   const data = await api.get('boards', { searchParams: params }).json();
   return paginatedBoardsSchema.parse(data);
 }

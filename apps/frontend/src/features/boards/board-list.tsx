@@ -1,13 +1,14 @@
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, LayoutGridIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { Board } from '@min-trello/shared';
+import type { BoardListItem } from '@min-trello/shared';
 import { Button } from '@/shared/ui/button';
+import { Badge } from '@/shared/ui/badge';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' });
 
 interface BoardListProps {
-  boards: Board[];
+  boards: BoardListItem[];
   page: number;
   limit: number;
   total: number;
@@ -28,7 +29,16 @@ export function BoardList({ boards, page, limit, total, onPageChange }: BoardLis
             >
               <Card className="h-full transition-colors hover:border-ring">
                 <CardHeader>
-                  <CardTitle className="truncate">{board.title}</CardTitle>
+                  <CardTitle className="flex items-center justify-between gap-2">
+                    <span className="truncate">{board.title}</span>
+                    <Badge
+                      variant="secondary"
+                      aria-label={`Карточек на доске: ${board.cardsCount}`}
+                    >
+                      <LayoutGridIcon className="size-3" />
+                      {board.cardsCount}
+                    </Badge>
+                  </CardTitle>
                   <CardDescription>
                     Создана {dateFormatter.format(new Date(board.createdAt))}
                   </CardDescription>

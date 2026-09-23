@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import type { Board, BoardWithColumns } from '@min-trello/shared';
+import type { Board, BoardListItem, BoardWithColumns } from '@min-trello/shared';
 import type { ActivityService } from '../activity/activity.service';
 import type { BoardsGateway } from './boards.gateway';
 import type { IBoardRepository } from './repositories/board.repository';
@@ -12,6 +12,8 @@ const board: Board = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
+
+const boardListItem: BoardListItem = { ...board, cardsCount: 0 };
 
 const boardWithColumns: BoardWithColumns = { ...board, columns: [] };
 
@@ -44,7 +46,7 @@ describe('BoardsService', () => {
 
   describe('list', () => {
     it('returns the owner paginated boards', async () => {
-      const paginated = { items: [board], total: 1, page: 1, limit: 20 };
+      const paginated = { items: [boardListItem], total: 1, page: 1, limit: 20 };
       boardRepo.findByOwner.mockResolvedValue(paginated);
 
       await expect(service.list('user-1', { page: 2, limit: 5, search: 'my' })).resolves.toBe(

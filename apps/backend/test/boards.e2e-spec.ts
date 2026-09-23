@@ -73,6 +73,36 @@ describe('Boards (e2e)', () => {
 
     expect(page.body).toMatchObject({ total: 3, page: 1, limit: 2 });
     expect(page.body.items).toHaveLength(2);
+    expect(page.body.items[0]).toMatchObject({ cardsCount: 0 });
+  });
+
+  it('reports the number of cards per board', async () => {
+    const token = await register('alice@example.com');
+    const board = await createBoard(token, 'Counted');
+
+    const column = await request(app.getHttpServer())
+      .post(`/api/boards/${board.id}/columns`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'In Progress' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/columns/${column.body.id}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'First' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/columns/${column.body.id}/cards`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Second' })
+      .expect(201);
+
+    const page = await request(app.getHttpServer())
+      .get('/api/boards')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(page.body.items[0]).toMatchObject({ id: board.id, cardsCount: 2 });
   });
 
   it('filters boards by search term', async () => {

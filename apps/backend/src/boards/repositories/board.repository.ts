@@ -1,4 +1,4 @@
-import type { Board, BoardWithColumns, Paginated } from '@min-trello/shared';
+import type { Board, BoardListItem, BoardWithColumns, Paginated } from '@min-trello/shared';
 
 export const BOARD_REPOSITORY_TOKEN = 'BOARD_REPOSITORY';
 
@@ -10,7 +10,7 @@ export interface IBoardRepository {
     page?: number,
     limit?: number,
     search?: string,
-  ): Promise<Paginated<Board>>;
+  ): Promise<Paginated<BoardListItem>>;
   create(data: { title: string; ownerId: string }): Promise<Board>;
   update(id: string, data: { title?: string }): Promise<Board>;
   delete(id: string): Promise<void>;

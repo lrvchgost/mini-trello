@@ -14,6 +14,10 @@ export const boardWithColumnsSchema = boardSchema.extend({
   columns: z.array(columnWithCardsSchema),
 });
 
+export const boardListItemSchema = boardSchema.extend({
+  cardsCount: z.number().int().nonnegative(),
+});
+
 export const createBoardSchema = z.object({
   title: z.string().min(1).max(200),
 });

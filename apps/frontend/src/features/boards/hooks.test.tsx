@@ -28,7 +28,9 @@ describe('boards hooks', () => {
   });
 
   it('queries the requested page and parses the paginated response', async () => {
-    mocks.api.get.mockReturnValue(mockJson({ items: [board], total: 42, page: 2, limit: 10 }));
+    mocks.api.get.mockReturnValue(
+      mockJson({ items: [{ ...board, cardsCount: 7 }], total: 42, page: 2, limit: 10 }),
+    );
 
     const { result } = renderHook(() => useBoardsQuery({ page: 2, limit: 10 }), {
       wrapper: createQueryWrapper(createTestQueryClient()),
@@ -42,6 +44,7 @@ describe('boards hooks', () => {
     expect(result.current.data?.total).toBe(42);
     expect(result.current.data?.items[0]?.id).toBe(board.id);
     expect(result.current.data?.items[0]?.createdAt).toBeInstanceOf(Date);
+    expect(result.current.data?.items[0]?.cardsCount).toBe(7);
   });
 
   it('creates a board and invalidates the board list', async () => {

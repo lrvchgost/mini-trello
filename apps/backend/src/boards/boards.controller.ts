@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Board, BoardWithColumns, Paginated } from '@min-trello/shared';
+import type { Board, BoardListItem, BoardWithColumns, Paginated } from '@min-trello/shared';
 import { ClientId } from '../common/decorators/client-id.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { BoardAccessGuard } from '../common/guards/board-access.guard';
@@ -33,7 +33,7 @@ export class BoardsController {
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: ListBoardsDto,
-  ): Promise<Paginated<Board>> {
+  ): Promise<Paginated<BoardListItem>> {
     return this.boardsService.list(user.id, query);
   }
 

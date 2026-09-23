@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { Board, BoardWithColumns, Paginated } from '@min-trello/shared';
+import type { Board, BoardListItem, BoardWithColumns, Paginated } from '@min-trello/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { IBoardRepository } from './board.repository';
 
@@ -29,21 +29,27 @@ export class PrismaBoardRepository implements IBoardRepository {
     page = 1,
     limit = 20,
     search?: string,
-  ): Promise<Paginated<Board>> {
+  ): Promise<Paginated<BoardListItem>> {
     const where: Prisma.BoardWhereInput = {
       ownerId,
       ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [rows, total] = await this.prisma.$transaction([
       this.prisma.board.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: { columns: { select: { _count: { select: { cards: true } } } } },
       }),
       this.prisma.board.count({ where }),
     ]);
+
+    const items = rows.map(({ columns, ...board }) => ({
+      ...board,
+      cardsCount: columns.reduce((sum, column) => sum + column._count.cards, 0),
+    }));
 
     return { items, total, page, limit };
   }

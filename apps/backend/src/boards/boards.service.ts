@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   Board,
+  BoardListItem,
   BoardListQuery,
   BoardWithColumns,
   CreateBoardInput,
@@ -21,7 +22,7 @@ export class BoardsService {
     private readonly boardsGateway: BoardsGateway,
   ) {}
 
-  list(ownerId: string, query: BoardListQuery): Promise<Paginated<Board>> {
+  list(ownerId: string, query: BoardListQuery): Promise<Paginated<BoardListItem>> {
     return this.boardRepo.findByOwner(ownerId, query.page, query.limit, query.search);
   }
 
