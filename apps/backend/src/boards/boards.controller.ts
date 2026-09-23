@@ -47,13 +47,17 @@ export class BoardsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateBoardDto): Promise<Board> {
-    return this.boardsService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateBoardDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<Board> {
+    return this.boardsService.update(id, dto, user.id);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
-  remove(@Param('id') id: string): Promise<void> {
-    return this.boardsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser): Promise<void> {
+    return this.boardsService.remove(id, user.id);
   }
 }

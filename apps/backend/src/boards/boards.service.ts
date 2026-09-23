@@ -7,6 +7,7 @@ import type {
   Paginated,
   UpdateBoardInput,
 } from '@min-trello/shared';
+import { ActivityService } from '../activity/activity.service';
 import { ErrorCode } from '../common/errors';
 import { BOARD_REPOSITORY_TOKEN, type IBoardRepository } from './repositories/board.repository';
 
@@ -15,14 +16,17 @@ export class BoardsService {
   constructor(
     @Inject(BOARD_REPOSITORY_TOKEN)
     private readonly boardRepo: IBoardRepository,
+    private readonly activityService: ActivityService,
   ) {}
 
   list(ownerId: string, query: BoardListQuery): Promise<Paginated<Board>> {
     return this.boardRepo.findByOwner(ownerId, query.page, query.limit, query.search);
   }
 
-  create(ownerId: string, input: CreateBoardInput): Promise<Board> {
-    return this.boardRepo.create({ title: input.title, ownerId });
+  async create(ownerId: string, input: CreateBoardInput): Promise<Board> {
+    const board = await this.boardRepo.create({ title: input.title, ownerId });
+    await this.activityService.log(board.id, 'board.created', { title: board.title }, ownerId);
+    return board;
   }
 
   async findOne(id: string): Promise<BoardWithColumns> {
@@ -36,11 +40,14 @@ export class BoardsService {
     return board;
   }
 
-  update(id: string, input: UpdateBoardInput): Promise<Board> {
-    return this.boardRepo.update(id, input);
+  async update(id: string, input: UpdateBoardInput, actorId: string): Promise<Board> {
+    const board = await this.boardRepo.update(id, input);
+    await this.activityService.log(id, 'board.updated', { changes: input }, actorId);
+    return board;
   }
 
-  remove(id: string): Promise<void> {
-    return this.boardRepo.delete(id);
+  async remove(id: string, actorId: string): Promise<void> {
+    await this.activityService.log(id, 'board.deleted', {}, actorId);
+    await this.boardRepo.delete(id);
   }
 }

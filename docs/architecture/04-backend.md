@@ -185,7 +185,7 @@ export class BoardsService {
 
   async create(ownerId: string, title: string, actorId: string, clientId: string) {
     const board = await this.boardRepo.create({ title, ownerId });
-    await this.activityService.log(board.id, 'board.created', {});
+    await this.activityService.log(board.id, 'board.created', {}, actorId);
     this.boardsGateway.emitBoardUpdated({ board, actorId, clientId });
     return board;
   }
@@ -366,7 +366,7 @@ async moveCard(
   if (!card) throw new NotFoundException({ error: 'CARD_NOT_FOUND' });
 
   await this.cardRepo.move(cardId, targetColumnId, targetOrder);
-  await this.activityService.log(boardId, 'card.moved', { cardId, targetColumnId });
+  await this.activityService.log(boardId, 'card.moved', { cardId, targetColumnId }, actorId);
   this.cardsGateway.emitCardMoved({ cardId, targetColumnId, newOrder: targetOrder, actorId, clientId });
 }
 ```

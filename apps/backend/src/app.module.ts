@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ActivityModule } from './activity/activity.module';
 import { AuthModule } from './auth/auth.module';
 import { BoardsModule } from './boards/boards.module';
 import { BoardAccessModule } from './common/access/board-access.module';
@@ -17,6 +18,7 @@ import { AppConfigModule } from './config/config.module';
 import { LabelsModule } from './labels/labels.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RepositoriesModule } from './prisma/repositories.module';
+import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -24,8 +26,10 @@ import { UsersModule } from './users/users.module';
     AppConfigModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
+    RedisModule,
     RepositoriesModule,
     BoardAccessModule,
+    ActivityModule,
     AuthModule,
     UsersModule,
     BoardsModule,

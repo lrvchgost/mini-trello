@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { Comment, CreateCommentInput, Paginated } from '@min-trello/shared';
+import type { ActivityAction, Comment, CreateCommentInput, Paginated } from '@min-trello/shared';
+import { ActivityService } from '../activity/activity.service';
 import { ErrorCode } from '../common/errors';
 import { CARD_REPOSITORY_TOKEN, type ICardRepository } from '../cards/repositories/card.repository';
 import {
@@ -14,6 +15,7 @@ export class CommentsService {
     private readonly commentRepo: ICommentRepository,
     @Inject(CARD_REPOSITORY_TOKEN)
     private readonly cardRepo: ICardRepository,
+    private readonly activityService: ActivityService,
   ) {}
 
   async list(cardId: string, page: number, limit: number): Promise<Paginated<Comment>> {
@@ -21,12 +23,29 @@ export class CommentsService {
     return this.commentRepo.findByCard(cardId, page, limit);
   }
 
-  async create(cardId: string, input: CreateCommentInput, authorId: string): Promise<Comment> {
+  async create(
+    cardId: string,
+    input: CreateCommentInput,
+    authorId: string,
+    boardId?: string,
+  ): Promise<Comment> {
     await this.ensureCard(cardId);
-    return this.commentRepo.create({ content: input.content, cardId, authorId });
+    const comment = await this.commentRepo.create({
+      content: input.content,
+      cardId,
+      authorId,
+    });
+    await this.logActivity(
+      boardId,
+      'comment.created',
+      { commentId: comment.id, cardId },
+      authorId,
+      cardId,
+    );
+    return comment;
   }
 
-  async remove(id: string, userId: string): Promise<void> {
+  async remove(id: string, userId: string, boardId?: string): Promise<void> {
     const comment = await this.commentRepo.findById(id);
     if (!comment) {
       throw this.notFound();
@@ -38,6 +57,26 @@ export class CommentsService {
       });
     }
     await this.commentRepo.remove(id);
+    await this.logActivity(
+      boardId,
+      'comment.deleted',
+      { commentId: id, cardId: comment.cardId },
+      userId,
+      comment.cardId,
+    );
+  }
+
+  private async logActivity(
+    boardId: string | undefined,
+    action: ActivityAction,
+    payload: Record<string, unknown>,
+    actorId: string,
+    cardId?: string | null,
+  ): Promise<void> {
+    if (!boardId) {
+      return;
+    }
+    await this.activityService.log(boardId, action, payload, actorId, cardId);
   }
 
   private async ensureCard(cardId: string): Promise<void> {

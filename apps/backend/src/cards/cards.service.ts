@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type {
+  ActivityAction,
   AssignCardInput,
   Card,
   CardDetail,
@@ -13,6 +14,7 @@ import type {
   MoveCardInput,
   UpdateCardInput,
 } from '@min-trello/shared';
+import { ActivityService } from '../activity/activity.service';
 import { ErrorCode } from '../common/errors';
 import {
   COLUMN_REPOSITORY_TOKEN,
@@ -32,10 +34,24 @@ export class CardsService {
     private readonly cardRepo: ICardRepository,
     @Inject(COLUMN_REPOSITORY_TOKEN)
     private readonly columnRepo: IColumnRepository,
+    private readonly activityService: ActivityService,
   ) {}
 
-  create(columnId: string, input: CreateCardInput): Promise<Card> {
-    return this.cardRepo.create({ ...input, columnId });
+  async create(
+    columnId: string,
+    input: CreateCardInput,
+    actorId: string,
+    boardId?: string,
+  ): Promise<Card> {
+    const card = await this.cardRepo.create({ ...input, columnId });
+    await this.logActivity(
+      boardId,
+      'card.created',
+      { cardId: card.id, title: card.title },
+      actorId,
+      card.id,
+    );
+    return card;
   }
 
   async findOne(id: string): Promise<CardDetail> {
@@ -46,7 +62,12 @@ export class CardsService {
     return card;
   }
 
-  async update(id: string, input: UpdateCardInput): Promise<Card> {
+  async update(
+    id: string,
+    input: UpdateCardInput,
+    actorId: string,
+    boardId?: string,
+  ): Promise<Card> {
     await this.ensureExists(id);
 
     const card = await this.cardRepo.update(id, input);
@@ -56,10 +77,23 @@ export class CardsService {
         message: 'Card was modified by another request',
       });
     }
+
+    await this.logActivity(
+      boardId,
+      'card.updated',
+      { cardId: card.id, changes: input },
+      actorId,
+      card.id,
+    );
     return card;
   }
 
-  async move(id: string, input: MoveCardInput, boardId: string): Promise<MoveCardResult> {
+  async move(
+    id: string,
+    input: MoveCardInput,
+    actorId: string,
+    boardId?: string,
+  ): Promise<MoveCardResult> {
     await this.ensureExists(id);
 
     const column = await this.columnRepo.findById(input.columnId);
@@ -71,11 +105,23 @@ export class CardsService {
     }
 
     const card = await this.cardRepo.move(id, input.columnId, input.order);
+    await this.logActivity(
+      boardId,
+      'card.moved',
+      { cardId: card.id, targetColumnId: card.columnId, newOrder: card.order },
+      actorId,
+      card.id,
+    );
     return { columnId: card.columnId, order: card.order };
   }
 
-  async assign(id: string, input: AssignCardInput, ownerId: string): Promise<Card> {
-    if (input.assigneeId !== null && input.assigneeId !== ownerId) {
+  async assign(
+    id: string,
+    input: AssignCardInput,
+    actorId: string,
+    boardId?: string,
+  ): Promise<Card> {
+    if (input.assigneeId !== null && input.assigneeId !== actorId) {
       throw new UnprocessableEntityException({
         error: ErrorCode.INVALID_ASSIGNEE,
         message: 'Assignee must be the board owner',
@@ -83,12 +129,34 @@ export class CardsService {
     }
 
     await this.ensureExists(id);
-    return this.cardRepo.setAssignee(id, input.assigneeId);
+    const card = await this.cardRepo.setAssignee(id, input.assigneeId);
+    await this.logActivity(
+      boardId,
+      'card.assignee_changed',
+      { cardId: card.id, assigneeId: card.assigneeId },
+      actorId,
+      card.id,
+    );
+    return card;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, actorId: string, boardId?: string): Promise<void> {
     await this.ensureExists(id);
     await this.cardRepo.remove(id);
+    await this.logActivity(boardId, 'card.deleted', { cardId: id }, actorId);
+  }
+
+  private async logActivity(
+    boardId: string | undefined,
+    action: ActivityAction,
+    payload: Record<string, unknown>,
+    actorId: string,
+    cardId?: string | null,
+  ): Promise<void> {
+    if (!boardId) {
+      return;
+    }
+    await this.activityService.log(boardId, action, payload, actorId, cardId);
   }
 
   private async ensureExists(id: string): Promise<void> {

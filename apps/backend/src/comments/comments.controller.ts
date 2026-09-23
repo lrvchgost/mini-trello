@@ -11,7 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Comment, Paginated } from '@min-trello/shared';
+import type { Board, Comment, Paginated } from '@min-trello/shared';
+import { CurrentBoard } from '../common/decorators/current-board.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { BoardAccessGuard } from '../common/guards/board-access.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -39,13 +40,18 @@ export class CommentsController {
     @Param('cardId') cardId: string,
     @Body() dto: CreateCommentDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentBoard() board?: Board,
   ): Promise<Comment> {
-    return this.commentsService.create(cardId, dto, user.id);
+    return this.commentsService.create(cardId, dto, user.id, board?.id);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('comments/:id')
-  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser): Promise<void> {
-    return this.commentsService.remove(id, user.id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentBoard() board?: Board,
+  ): Promise<void> {
+    return this.commentsService.remove(id, user.id, board?.id);
   }
 }

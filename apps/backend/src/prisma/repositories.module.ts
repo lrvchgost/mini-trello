@@ -1,6 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { REFRESH_TOKEN_REPOSITORY_TOKEN } from '../auth/repositories/refresh-token.repository';
 import { PrismaRefreshTokenRepository } from '../auth/repositories/prisma-refresh-token.repository';
+import { ACTIVITY_REPOSITORY_TOKEN } from '../activity/repositories/activity.repository';
+import { PrismaActivityRepository } from '../activity/repositories/prisma-activity.repository';
 import { BOARD_REPOSITORY_TOKEN } from '../boards/repositories/board.repository';
 import { PrismaBoardRepository } from '../boards/repositories/prisma-board.repository';
 import { CARD_REPOSITORY_TOKEN } from '../cards/repositories/card.repository';
@@ -26,6 +28,7 @@ import { PrismaModule } from './prisma.module';
     { provide: CARD_REPOSITORY_TOKEN, useClass: PrismaCardRepository },
     { provide: LABEL_REPOSITORY_TOKEN, useClass: PrismaLabelRepository },
     { provide: COMMENT_REPOSITORY_TOKEN, useClass: PrismaCommentRepository },
+    { provide: ACTIVITY_REPOSITORY_TOKEN, useClass: PrismaActivityRepository },
   ],
   exports: [
     USER_REPOSITORY_TOKEN,
@@ -35,6 +38,7 @@ import { PrismaModule } from './prisma.module';
     CARD_REPOSITORY_TOKEN,
     LABEL_REPOSITORY_TOKEN,
     COMMENT_REPOSITORY_TOKEN,
+    ACTIVITY_REPOSITORY_TOKEN,
   ],
 })
 export class RepositoriesModule {}

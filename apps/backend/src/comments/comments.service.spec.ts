@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { Card, Comment, Paginated } from '@min-trello/shared';
+import type { ActivityService } from '../activity/activity.service';
 import type { ICardRepository } from '../cards/repositories/card.repository';
 import { CommentsService } from './comments.service';
 import type { ICommentRepository } from './repositories/comment.repository';
@@ -32,6 +33,7 @@ describe('CommentsService', () => {
   let service: CommentsService;
   let commentRepo: jest.Mocked<ICommentRepository>;
   let cardRepo: jest.Mocked<ICardRepository>;
+  let activityService: jest.Mocked<ActivityService>;
 
   beforeEach(() => {
     commentRepo = {
@@ -52,7 +54,11 @@ describe('CommentsService', () => {
       remove: jest.fn(),
     };
 
-    service = new CommentsService(commentRepo, cardRepo);
+    activityService = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as jest.Mocked<ActivityService>;
+
+    service = new CommentsService(commentRepo, cardRepo, activityService);
   });
 
   describe('list', () => {
@@ -73,48 +79,68 @@ describe('CommentsService', () => {
   });
 
   describe('create', () => {
-    it('creates a comment authored by the current user', async () => {
+    it('creates a comment authored by the current user and logs activity', async () => {
       cardRepo.findById.mockResolvedValue(card);
       commentRepo.create.mockResolvedValue(comment);
 
-      await expect(service.create('card-1', { content: 'ping' }, 'user-1')).resolves.toBe(comment);
+      await expect(
+        service.create('card-1', { content: 'ping' }, 'user-1', 'board-1'),
+      ).resolves.toBe(comment);
       expect(commentRepo.create).toHaveBeenCalledWith({
         content: 'ping',
         cardId: 'card-1',
         authorId: 'user-1',
       });
+      expect(activityService.log).toHaveBeenCalledWith(
+        'board-1',
+        'comment.created',
+        { commentId: 'comment-1', cardId: 'card-1' },
+        'user-1',
+        'card-1',
+      );
     });
 
     it('throws CARD_NOT_FOUND when the card is missing', async () => {
       cardRepo.findById.mockResolvedValue(null);
 
-      await expect(service.create('missing', { content: 'ping' }, 'user-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.create('missing', { content: 'ping' }, 'user-1', 'board-1'),
+      ).rejects.toThrow(NotFoundException);
       expect(commentRepo.create).not.toHaveBeenCalled();
     });
   });
 
   describe('remove', () => {
-    it('deletes the comment when requested by its author', async () => {
+    it('deletes the comment when requested by its author and logs activity', async () => {
       commentRepo.findById.mockResolvedValue(comment);
       commentRepo.remove.mockResolvedValue(undefined);
 
-      await service.remove('comment-1', 'user-1');
+      await service.remove('comment-1', 'user-1', 'board-1');
       expect(commentRepo.remove).toHaveBeenCalledWith('comment-1');
+      expect(activityService.log).toHaveBeenCalledWith(
+        'board-1',
+        'comment.deleted',
+        { commentId: 'comment-1', cardId: 'card-1' },
+        'user-1',
+        'card-1',
+      );
     });
 
     it('throws COMMENT_NOT_FOUND when the comment is missing', async () => {
       commentRepo.findById.mockResolvedValue(null);
 
-      await expect(service.remove('missing', 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('missing', 'user-1', 'board-1')).rejects.toThrow(
+        NotFoundException,
+      );
       expect(commentRepo.remove).not.toHaveBeenCalled();
     });
 
     it('forbids deleting a comment of another author (403)', async () => {
       commentRepo.findById.mockResolvedValue({ ...comment, authorId: 'user-2' });
 
-      await expect(service.remove('comment-1', 'user-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.remove('comment-1', 'user-1', 'board-1')).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(commentRepo.remove).not.toHaveBeenCalled();
     });
   });

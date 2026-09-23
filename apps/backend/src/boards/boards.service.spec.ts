@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import type { Board, BoardWithColumns } from '@min-trello/shared';
+import type { ActivityService } from '../activity/activity.service';
 import type { IBoardRepository } from './repositories/board.repository';
 import { BoardsService } from './boards.service';
 
@@ -16,6 +17,7 @@ const boardWithColumns: BoardWithColumns = { ...board, columns: [] };
 describe('BoardsService', () => {
   let service: BoardsService;
   let boardRepo: jest.Mocked<IBoardRepository>;
+  let activityService: jest.Mocked<ActivityService>;
 
   beforeEach(() => {
     boardRepo = {
@@ -27,7 +29,11 @@ describe('BoardsService', () => {
       delete: jest.fn(),
     };
 
-    service = new BoardsService(boardRepo);
+    activityService = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as jest.Mocked<ActivityService>;
+
+    service = new BoardsService(boardRepo, activityService);
   });
 
   describe('list', () => {
@@ -43,11 +49,17 @@ describe('BoardsService', () => {
   });
 
   describe('create', () => {
-    it('creates a board owned by the current user', async () => {
+    it('creates a board owned by the current user and logs activity', async () => {
       boardRepo.create.mockResolvedValue(board);
 
       await expect(service.create('user-1', { title: 'My Board' })).resolves.toBe(board);
       expect(boardRepo.create).toHaveBeenCalledWith({ title: 'My Board', ownerId: 'user-1' });
+      expect(activityService.log).toHaveBeenCalledWith(
+        'board-1',
+        'board.created',
+        { title: 'My Board' },
+        'user-1',
+      );
     });
   });
 
@@ -66,20 +78,29 @@ describe('BoardsService', () => {
   });
 
   describe('update', () => {
-    it('updates the board title', async () => {
+    it('updates the board title and logs activity', async () => {
       const updated = { ...board, title: 'Renamed' };
       boardRepo.update.mockResolvedValue(updated);
 
-      await expect(service.update('board-1', { title: 'Renamed' })).resolves.toBe(updated);
+      await expect(service.update('board-1', { title: 'Renamed' }, 'user-1')).resolves.toBe(
+        updated,
+      );
       expect(boardRepo.update).toHaveBeenCalledWith('board-1', { title: 'Renamed' });
+      expect(activityService.log).toHaveBeenCalledWith(
+        'board-1',
+        'board.updated',
+        { changes: { title: 'Renamed' } },
+        'user-1',
+      );
     });
   });
 
   describe('remove', () => {
-    it('deletes the board', async () => {
+    it('logs activity and deletes the board', async () => {
       boardRepo.delete.mockResolvedValue(undefined);
 
-      await service.remove('board-1');
+      await service.remove('board-1', 'user-1');
+      expect(activityService.log).toHaveBeenCalledWith('board-1', 'board.deleted', {}, 'user-1');
       expect(boardRepo.delete).toHaveBeenCalledWith('board-1');
     });
   });
