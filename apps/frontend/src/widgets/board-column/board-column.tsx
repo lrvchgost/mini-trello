@@ -10,16 +10,20 @@ import { cn } from '@/shared/lib/utils';
 
 interface BoardColumnProps {
   column: ColumnWithCards;
+  className?: string;
 }
 
-function BoardColumnComponent({ column }: BoardColumnProps) {
+function BoardColumnComponent({ column, className }: BoardColumnProps) {
   const { search } = useLocation();
   const cards = [...column.cards].sort(byOrder);
 
   return (
     <section
       aria-label={column.title}
-      className="flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/40 p-3"
+      className={cn(
+        'flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/40 p-3',
+        className,
+      )}
     >
       <ColumnHeader title={column.title} count={cards.length} isDone={column.isDone} />
       <Droppable droppableId={column.id}>

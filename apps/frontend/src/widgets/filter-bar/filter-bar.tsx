@@ -1,4 +1,4 @@
-import { SearchIcon, XIcon } from 'lucide-react';
+import { SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
 import { PRIORITIES, type Priority } from '@min-trello/shared';
 import {
   useFilterValues,
@@ -8,9 +8,12 @@ import {
 } from '@/features/filters';
 import { useAssignableUsersQuery } from '@/features/cards';
 import { useBoardLabelsQuery } from '@/features/labels';
+import { useIsMobile } from '@/shared/hooks/use-media-query';
+import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/shared/ui/sheet';
 import { cn } from '@/shared/lib/utils';
 
 const PRIORITY_LABELS: Record<Priority, string> = {
@@ -29,7 +32,17 @@ interface FilterBarProps {
   className?: string;
 }
 
-export function FilterBar({ boardId, className }: FilterBarProps) {
+function countActive(filters: ReturnType<typeof useFilterValues>): number {
+  return (
+    (filters.q ? 1 : 0) +
+    (filters.priority ? 1 : 0) +
+    (filters.labelId ? 1 : 0) +
+    (filters.assigneeId ? 1 : 0) +
+    (filters.hasDeadline !== null ? 1 : 0)
+  );
+}
+
+function FilterFields({ boardId, className }: FilterBarProps) {
   const filters = useFilterValues();
   const setQuery = useFiltersStore((state) => state.setQuery);
   const setPriority = useFiltersStore((state) => state.setPriority);
@@ -158,4 +171,40 @@ export function FilterBar({ boardId, className }: FilterBarProps) {
       ) : null}
     </div>
   );
+}
+
+function MobileFilterBar({ boardId, className }: FilterBarProps) {
+  const filters = useFilterValues();
+  const active = countActive(filters);
+
+  return (
+    <div className={cn('flex items-center gap-2', className)}>
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button type="button" variant="outline" size="sm" className="gap-2">
+            <SlidersHorizontalIcon />
+            Фильтры
+            {active > 0 ? <Badge variant="secondary">{active}</Badge> : null}
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="bottom">
+          <SheetTitle>Фильтры</SheetTitle>
+          <SheetDescription className="sr-only">Фильтры по карточкам доски</SheetDescription>
+          <div className="overflow-y-auto">
+            <FilterFields boardId={boardId} className="border-0 bg-transparent p-0" />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+export function FilterBar({ boardId, className }: FilterBarProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return <MobileFilterBar boardId={boardId} className={className} />;
+  }
+
+  return <FilterFields boardId={boardId} className={className} />;
 }

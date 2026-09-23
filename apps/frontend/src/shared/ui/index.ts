@@ -56,3 +56,13 @@ export { Loading } from './loading';
 export { EmptyState } from './empty-state';
 export { ErrorBoundary } from './error-boundary';
 export { PublicOnlyRoute } from './public-only-route';
+export {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetOverlay,
+  SheetTitle,
+  SheetTrigger,
+} from './sheet';

@@ -42,7 +42,7 @@ export function StatsChart({ stats }: { stats: DashboardStats }) {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Карточки по статусам</CardTitle>
           <CardDescription>Суммарно по всем вашим доскам.</CardDescription>
@@ -73,7 +73,7 @@ export function StatsChart({ stats }: { stats: DashboardStats }) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Дедлайны</CardTitle>
           <CardDescription>Просроченные карточки вне колонок «Done».</CardDescription>

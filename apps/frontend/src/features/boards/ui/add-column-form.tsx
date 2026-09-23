@@ -4,12 +4,14 @@ import { useCreateColumn } from '@/entities/column';
 import { extractApiError, localizeApiError } from '@/shared/lib/errors';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
+import { cn } from '@/shared/lib/utils';
 
 interface AddColumnFormProps {
   boardId: string;
+  className?: string;
 }
 
-export function AddColumnForm({ boardId }: AddColumnFormProps) {
+export function AddColumnForm({ boardId, className }: AddColumnFormProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function AddColumnForm({ boardId }: AddColumnFormProps) {
   return (
     <section
       aria-label={open ? 'Новая колонка' : undefined}
-      className="w-72 shrink-0 rounded-xl border border-dashed bg-muted/20 p-3"
+      className={cn('w-72 shrink-0 rounded-xl border border-dashed bg-muted/20 p-3', className)}
     >
       {open ? (
         <form className="space-y-2" onSubmit={handleSubmit}>

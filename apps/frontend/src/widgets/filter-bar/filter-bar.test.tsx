@@ -1,7 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MOBILE_QUERY } from '@/shared/hooks/use-media-query';
 import { useFiltersStore } from '@/features/filters';
 import { createTestQueryClient } from '@/test/query-wrapper';
 import { FilterBar } from './filter-bar';
@@ -16,6 +17,22 @@ const boardId = 'clx000000000000000000001';
 
 function mockJson<T>(value: T) {
   return { json: vi.fn().mockResolvedValue(value) };
+}
+
+function mockMobile() {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: MOBILE_QUERY,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  );
 }
 
 function renderBar(props: { boardId?: string } = { boardId }) {
@@ -80,6 +97,23 @@ describe('FilterBar', () => {
     await user.click(screen.getByRole('button', { name: /сбросить/i }));
 
     await waitFor(() => expect(useFiltersStore.getState().q).toBe(''));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('collapses into a bottom sheet on mobile', async () => {
+    mockMobile();
+    const user = userEvent.setup();
+    renderBar();
+
+    expect(screen.queryByLabelText('Поиск по карточкам')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /фильтры/i }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Поиск по карточкам')).toBeInTheDocument();
   });
 
   it('hides the label filter without a board context', async () => {

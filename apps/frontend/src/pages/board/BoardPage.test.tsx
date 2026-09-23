@@ -1,7 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MOBILE_QUERY } from '@/shared/hooks/use-media-query';
 import { makeHttpError } from '@/test/http-error';
 import { createTestQueryClient } from '@/test/query-wrapper';
 import { BoardPage } from './BoardPage';
@@ -89,10 +90,31 @@ function renderPage() {
   );
 }
 
+function mockMobile(matches = true) {
+  const media = {
+    matches,
+    media: MOBILE_QUERY,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  };
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => media),
+  );
+}
+
 describe('BoardPage', () => {
   beforeEach(() => {
     mocks.api.get.mockReset();
     mocks.api.post.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders columns in order with cards sorted inside them', async () => {
@@ -147,5 +169,41 @@ describe('BoardPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /активность/i }));
 
     expect(await screen.findByText('Пока пусто')).toBeInTheDocument();
+  });
+
+  it('switches columns via tabs on mobile and renders a single column', async () => {
+    mockMobile();
+    mocks.api.get.mockReturnValue(mockJson(boardJson));
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Работа' });
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveTextContent('В работе');
+    expect(tabs[1]).toHaveTextContent('Готово');
+
+    const regions = screen.getAllByRole('region');
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toHaveAccessibleName('В работе');
+
+    fireEvent.click(screen.getByRole('tab', { name: /готово/i }));
+    expect(screen.getByRole('region')).toHaveAccessibleName('Готово');
+  });
+
+  it('shows activity in place of the board on mobile', async () => {
+    mockMobile();
+    mocks.api.get.mockImplementation((path: string) =>
+      path.endsWith('/activity')
+        ? mockJson({ items: [], total: 0, page: 1, limit: 20 })
+        : mockJson(boardJson),
+    );
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Работа' });
+    fireEvent.click(screen.getByRole('button', { name: /активность/i }));
+
+    expect(await screen.findByText('Пока пусто')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 });

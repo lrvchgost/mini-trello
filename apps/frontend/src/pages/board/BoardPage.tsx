@@ -18,12 +18,15 @@ import {
 } from '@/features/filters';
 import { useBoardLive } from '@/features/live';
 import { useDebouncedValue } from '@/shared/hooks/use-debounced-value';
+import { useIsMobile } from '@/shared/hooks/use-media-query';
 import { extractApiError } from '@/shared/lib/errors';
 import { byOrder } from '@/shared/lib/order';
+import { cn } from '@/shared/lib/utils';
+import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Loading } from '@/shared/ui/loading';
-import { ActivityPanel } from '@/widgets/activity-log';
+import { ActivityLog, ActivityPanel } from '@/widgets/activity-log';
 import { BoardColumn } from '@/widgets/board-column';
 import { FilterBar } from '@/widgets/filter-bar';
 
@@ -37,6 +40,11 @@ export function BoardPage() {
   useBoardLive(id);
   const columns = useMemo(() => [...(data?.columns ?? [])].sort(byOrder), [data]);
   const moveCard = useMoveCard(id ?? '');
+
+  const isMobile = useIsMobile();
+  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
+  const activeColumn =
+    columns.find((column) => column.id === selectedColumnId) ?? columns[0] ?? null;
 
   const filters = useFilterValues();
   const debouncedQ = useDebouncedValue(filters.q, DEBOUNCE_MS);
@@ -54,6 +62,7 @@ export function BoardPage() {
   const search = useBoardSearchQuery(id ?? '', buildSearchQuery(effective, page), filtering);
 
   const notFound = isError && extractApiError(error).status === 404;
+  const showMobileActivity = isMobile && activityOpen && Boolean(data);
 
   function handleDragEnd(result: DropResult) {
     const { draggableId, source, destination } = result;
@@ -73,8 +82,9 @@ export function BoardPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">
-          <Link to="/dashboard">
-            <ArrowLeftIcon />К доскам
+          <Link to="/dashboard" aria-label="К доскам">
+            <ArrowLeftIcon />
+            <span className="hidden sm:inline">К доскам</span>
           </Link>
         </Button>
         {data ? (
@@ -90,12 +100,12 @@ export function BoardPage() {
             type="button"
             variant={activityOpen ? 'secondary' : 'outline'}
             size="sm"
-            className="ml-auto"
+            className="ml-auto shrink-0"
             aria-pressed={activityOpen}
             onClick={() => setActivityOpen((value) => !value)}
           >
             <PanelRightIcon />
-            Активность
+            <span className="hidden sm:inline">Активность</span>
           </Button>
         ) : null}
       </div>
@@ -123,46 +133,98 @@ export function BoardPage() {
             </p>
           ) : null}
 
-          {data ? <FilterBar boardId={id} /> : null}
-
-          {data && filtering ? (
-            <SearchResults
-              data={search.data}
-              isPending={search.isPending}
-              isError={search.isError}
-              page={page}
-              limit={DEFAULT_LIMIT}
-              onPageChange={setPage}
-              boardId={id}
-            />
-          ) : null}
-
-          {data && !filtering ? (
+          {showMobileActivity && data ? (
+            <ActivityLog boardId={data.id} className="w-full" />
+          ) : (
             <>
-              {moveCard.isError ? (
-                <p role="alert" className="text-sm text-destructive">
-                  Не удалось переместить карточку. Изменения отменены.
-                </p>
+              {data ? <FilterBar boardId={id} /> : null}
+
+              {data && filtering ? (
+                <SearchResults
+                  data={search.data}
+                  isPending={search.isPending}
+                  isError={search.isError}
+                  page={page}
+                  limit={DEFAULT_LIMIT}
+                  onPageChange={setPage}
+                  boardId={id}
+                />
               ) : null}
 
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <div className="flex items-start gap-4 overflow-x-auto pb-2">
-                  {columns.map((column) => (
-                    <BoardColumn key={column.id} column={column} />
-                  ))}
-                  {columns.length === 0 ? (
-                    <p className="w-72 shrink-0 self-center rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-                      Колонок пока нет. Создайте первую — карточки добавите внутри.
+              {data && !filtering ? (
+                <>
+                  {moveCard.isError ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      Не удалось переместить карточку. Изменения отменены.
                     </p>
                   ) : null}
-                  {id ? <AddColumnForm boardId={id} /> : null}
-                </div>
-              </DragDropContext>
+
+                  <DragDropContext onDragEnd={handleDragEnd}>
+                    {isMobile ? (
+                      <div className="space-y-3">
+                        {columns.length > 0 ? (
+                          <div
+                            role="tablist"
+                            aria-label="Колонки доски"
+                            className="flex gap-2 overflow-x-auto pb-1"
+                          >
+                            {columns.map((column) => {
+                              const selected = column.id === activeColumn?.id;
+                              return (
+                                <Button
+                                  key={column.id}
+                                  type="button"
+                                  role="tab"
+                                  size="sm"
+                                  variant={selected ? 'secondary' : 'ghost'}
+                                  aria-selected={selected}
+                                  className={cn(
+                                    'shrink-0 gap-2',
+                                    !selected && 'text-muted-foreground',
+                                  )}
+                                  onClick={() => setSelectedColumnId(column.id)}
+                                >
+                                  <span className="max-w-[10rem] truncate">{column.title}</span>
+                                  <Badge variant="outline">{column.cards.length}</Badge>
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+
+                        {activeColumn ? (
+                          <div role="tabpanel" aria-label={`${activeColumn.title} — карточки`}>
+                            <BoardColumn column={activeColumn} className="w-full" />
+                          </div>
+                        ) : (
+                          <p className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                            Колонок пока нет. Создайте первую — карточки добавите внутри.
+                          </p>
+                        )}
+
+                        {id ? <AddColumnForm boardId={id} className="w-full" /> : null}
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-4 overflow-x-auto pb-2">
+                        {columns.map((column) => (
+                          <BoardColumn key={column.id} column={column} />
+                        ))}
+                        {columns.length === 0 ? (
+                          <p className="w-72 shrink-0 self-center rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                            Колонок пока нет. Создайте первую — карточки добавите внутри.
+                          </p>
+                        ) : null}
+                        {id ? <AddColumnForm boardId={id} /> : null}
+                      </div>
+                    )}
+                  </DragDropContext>
+                </>
+              ) : null}
             </>
-          ) : null}
+          )}
         </div>
 
-        {data ? <ActivityPanel boardId={data.id} open={activityOpen} /> : null}
+        {data && !isMobile ? <ActivityPanel boardId={data.id} open={activityOpen} /> : null}
       </div>
 
       <Outlet />
