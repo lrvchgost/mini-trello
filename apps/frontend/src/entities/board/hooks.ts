@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_LIMIT, DEFAULT_PAGE, type CreateBoardInput } from '@min-trello/shared';
+import { dashboardQueryKeys } from '@/shared/api/query-keys';
 import { createBoard, fetchBoard, fetchBoards, type BoardListParams } from './api';
 import { boardQueryKeys } from './query-keys';
 
@@ -28,6 +29,7 @@ export function useCreateBoard() {
     mutationFn: (input: CreateBoardInput) => createBoard(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: boardQueryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all });
     },
   });
 }

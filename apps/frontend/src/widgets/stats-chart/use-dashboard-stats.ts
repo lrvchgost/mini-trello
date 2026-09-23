@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { dashboardStatsSchema, type DashboardStats } from '@min-trello/shared';
 import { api } from '@/shared/api/ky-client';
+import { dashboardQueryKeys } from '@/shared/api/query-keys';
 
-export const dashboardStatsQueryKey = ['dashboard', 'stats'] as const;
+export const dashboardStatsQueryKey = dashboardQueryKeys.stats();
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   const data = await api.get('dashboard/stats').json();

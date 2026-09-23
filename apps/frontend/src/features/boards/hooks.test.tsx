@@ -59,6 +59,7 @@ describe('boards hooks', () => {
     });
 
     expect(mocks.api.post).toHaveBeenCalledWith('boards', { json: { title: 'Работа' } });
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalled());
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['boards'] });
   });
 });
