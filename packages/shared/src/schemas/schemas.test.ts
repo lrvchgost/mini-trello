@@ -15,6 +15,7 @@ import {
   paginated,
   paginationQuerySchema,
   registerSchema,
+  searchQuerySchema,
   updateCardSchema,
 } from './index';
 
@@ -152,5 +153,22 @@ describe('pagination', () => {
     const schema = paginated(z.object({ id: z.string() }));
     const result = schema.safeParse({ items: [{ id: '1' }], total: 1, page: 1, limit: 20 });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('search query schema', () => {
+  it('applies pagination defaults and coerces filters', () => {
+    const parsed = searchQuerySchema.parse({ priority: 'high', hasDeadline: 'true' });
+    expect(parsed).toEqual({ page: 1, limit: 20, priority: 'high', hasDeadline: true });
+  });
+
+  it('parses hasDeadline=false and rejects unknown priorities', () => {
+    expect(searchQuerySchema.parse({ hasDeadline: 'false' }).hasDeadline).toBe(false);
+    expect(searchQuerySchema.safeParse({ priority: 'nope' }).success).toBe(false);
+  });
+
+  it('rejects invalid label/assignee ids', () => {
+    expect(searchQuerySchema.safeParse({ label: 'not-cuid' }).success).toBe(false);
+    expect(searchQuerySchema.safeParse({ assignee: CUID }).success).toBe(true);
   });
 });

@@ -11,8 +11,12 @@ import { COLUMN_REPOSITORY_TOKEN } from '../columns/repositories/column.reposito
 import { PrismaColumnRepository } from '../columns/repositories/prisma-column.repository';
 import { COMMENT_REPOSITORY_TOKEN } from '../comments/repositories/comment.repository';
 import { PrismaCommentRepository } from '../comments/repositories/prisma-comment.repository';
+import { DASHBOARD_REPOSITORY_TOKEN } from '../dashboard/repositories/dashboard.repository';
+import { PrismaDashboardRepository } from '../dashboard/repositories/prisma-dashboard.repository';
 import { LABEL_REPOSITORY_TOKEN } from '../labels/repositories/label.repository';
 import { PrismaLabelRepository } from '../labels/repositories/prisma-label.repository';
+import { SEARCH_REPOSITORY_TOKEN } from '../search/repositories/search.repository';
+import { PrismaSearchRepository } from '../search/repositories/prisma-search.repository';
 import { USER_REPOSITORY_TOKEN } from '../users/repositories/user.repository';
 import { PrismaUserRepository } from '../users/repositories/prisma-user.repository';
 import { PrismaModule } from './prisma.module';
@@ -29,6 +33,8 @@ import { PrismaModule } from './prisma.module';
     { provide: LABEL_REPOSITORY_TOKEN, useClass: PrismaLabelRepository },
     { provide: COMMENT_REPOSITORY_TOKEN, useClass: PrismaCommentRepository },
     { provide: ACTIVITY_REPOSITORY_TOKEN, useClass: PrismaActivityRepository },
+    { provide: SEARCH_REPOSITORY_TOKEN, useClass: PrismaSearchRepository },
+    { provide: DASHBOARD_REPOSITORY_TOKEN, useClass: PrismaDashboardRepository },
   ],
   exports: [
     USER_REPOSITORY_TOKEN,
@@ -39,6 +45,8 @@ import { PrismaModule } from './prisma.module';
     LABEL_REPOSITORY_TOKEN,
     COMMENT_REPOSITORY_TOKEN,
     ACTIVITY_REPOSITORY_TOKEN,
+    SEARCH_REPOSITORY_TOKEN,
+    DASHBOARD_REPOSITORY_TOKEN,
   ],
 })
 export class RepositoriesModule {}

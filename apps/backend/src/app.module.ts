@@ -14,10 +14,12 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 import { CardsModule } from './cards/cards.module';
 import { ColumnsModule } from './columns/columns.module';
 import { CommentsModule } from './comments/comments.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { AppConfigModule } from './config/config.module';
 import { LabelsModule } from './labels/labels.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RepositoriesModule } from './prisma/repositories.module';
+import { SearchModule } from './search/search.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 
@@ -37,6 +39,8 @@ import { UsersModule } from './users/users.module';
     ColumnsModule,
     LabelsModule,
     CommentsModule,
+    SearchModule,
+    DashboardModule,
     HealthModule,
   ],
   providers: [

@@ -71,6 +71,10 @@ export class BoardAccessResolver {
       return req.params.id ?? null;
     }
 
+    if (route === '/boards/:id/search' && method === 'GET') {
+      return req.params.id ?? null;
+    }
+
     if (route === '/boards/:boardId/columns' && method === 'POST') {
       return req.params.boardId ?? null;
     }
