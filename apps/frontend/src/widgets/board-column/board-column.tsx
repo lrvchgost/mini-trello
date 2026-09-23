@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import type { ColumnWithCards } from '@min-trello/shared';
 import { CardItem } from '@/entities/card';
 import { AddCardForm } from '@/features/cards';
@@ -13,6 +13,7 @@ interface BoardColumnProps {
 }
 
 function BoardColumnComponent({ column }: BoardColumnProps) {
+  const { search } = useLocation();
   const cards = [...column.cards].sort(byOrder);
 
   return (
@@ -42,7 +43,7 @@ function BoardColumnComponent({ column }: BoardColumnProps) {
                     className={cn('list-none', dragSnapshot.isDragging && 'opacity-90')}
                   >
                     <Link
-                      to={`cards/${card.id}`}
+                      to={`cards/${card.id}${search}`}
                       className="block rounded-lg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     >
                       <CardItem card={card} />

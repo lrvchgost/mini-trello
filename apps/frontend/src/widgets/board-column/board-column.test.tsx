@@ -11,10 +11,10 @@ import { BoardColumn } from './board-column';
 const columnId = 'clx000000000000000000201';
 const boardId = 'clx000000000000000000001';
 
-function renderColumn(ui: ReactElement) {
+function renderColumn(ui: ReactElement, search = '') {
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
-      <MemoryRouter initialEntries={[`/boards/${boardId}`]}>
+      <MemoryRouter initialEntries={[`/boards/${boardId}${search}`]}>
         <DragDropContext onDragEnd={() => undefined}>{ui}</DragDropContext>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -69,6 +69,24 @@ describe('BoardColumn', () => {
     expect(screen.getByRole('link', { name: /Первая/ })).toHaveAttribute(
       'href',
       expect.stringContaining('cards/clx000000000000000000901'),
+    );
+  });
+
+  it('keeps the active filters in the card link', () => {
+    renderColumn(
+      <BoardColumn
+        column={makeColumn({
+          cards: [
+            makeCard({ id: 'clx000000000000000000901', title: 'Первая', order: 0, columnId }),
+          ],
+        })}
+      />,
+      '?q=fix&priority=high',
+    );
+
+    expect(screen.getByRole('link', { name: /Первая/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('cards/clx000000000000000000901?q=fix&priority=high'),
     );
   });
 });
