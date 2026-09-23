@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { CalendarClockIcon } from 'lucide-react';
 import type { Card, Priority } from '@min-trello/shared';
 import { Badge, type BadgeProps } from '@/shared/ui/badge';
@@ -23,7 +24,7 @@ interface CardItemProps {
   card: Card;
 }
 
-export function CardItem({ card }: CardItemProps) {
+function CardItemComponent({ card }: CardItemProps) {
   const overdue = card.deadline !== null && card.deadline.getTime() < Date.now();
 
   return (
@@ -46,3 +47,5 @@ export function CardItem({ card }: CardItemProps) {
     </article>
   );
 }
+
+export const CardItem = memo(CardItemComponent);

@@ -1,3 +1,4 @@
+import { DragDropContext } from '@hello-pangea/dnd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -13,7 +14,9 @@ const boardId = 'clx000000000000000000001';
 function renderColumn(ui: ReactElement) {
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
-      <MemoryRouter initialEntries={[`/boards/${boardId}`]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[`/boards/${boardId}`]}>
+        <DragDropContext onDragEnd={() => undefined}>{ui}</DragDropContext>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -50,5 +53,22 @@ describe('BoardColumn', () => {
     renderColumn(<BoardColumn column={makeColumn({ cards: [] })} />);
 
     expect(screen.getByText('Нет карточек')).toBeInTheDocument();
+  });
+
+  it('wraps each card in a link to the card modal', () => {
+    renderColumn(
+      <BoardColumn
+        column={makeColumn({
+          cards: [
+            makeCard({ id: 'clx000000000000000000901', title: 'Первая', order: 0, columnId }),
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: /Первая/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('cards/clx000000000000000000901'),
+    );
   });
 });

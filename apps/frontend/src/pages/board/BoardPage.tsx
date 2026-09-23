@@ -1,9 +1,10 @@
-import { DragDropContext } from '@hello-pangea/dnd';
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { ArrowLeftIcon, LayoutGridIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { Link, Outlet, useParams } from 'react-router-dom';
 import { useBoardQuery } from '@/entities/board';
 import { AddColumnForm } from '@/features/boards';
+import { useMoveCard } from '@/features/cards';
 import { extractApiError } from '@/shared/lib/errors';
 import { byOrder } from '@/shared/lib/order';
 import { Button } from '@/shared/ui/button';
@@ -15,8 +16,23 @@ export function BoardPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isPending, isError, error } = useBoardQuery(id);
   const columns = useMemo(() => [...(data?.columns ?? [])].sort(byOrder), [data]);
+  const moveCard = useMoveCard(id ?? '');
 
   const notFound = isError && extractApiError(error).status === 404;
+
+  function handleDragEnd(result: DropResult) {
+    const { draggableId, source, destination } = result;
+    if (!id || !destination) {
+      return;
+    }
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return;
+    }
+    moveCard.mutate({
+      id: draggableId,
+      input: { columnId: destination.droppableId, order: destination.index },
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -55,8 +71,14 @@ export function BoardPage() {
         </p>
       ) : null}
 
+      {moveCard.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Не удалось переместить карточку. Изменения отменены.
+        </p>
+      ) : null}
+
       {data ? (
-        <DragDropContext onDragEnd={() => undefined}>
+        <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex items-start gap-4 overflow-x-auto pb-2">
             {columns.map((column) => (
               <BoardColumn key={column.id} column={column} />
