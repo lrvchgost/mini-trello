@@ -6,6 +6,7 @@ import { NotFoundPage } from '@/pages/not-found/NotFoundPage';
 import { RegisterPage } from '@/pages/register/RegisterPage';
 import { ProtectedRoute } from '@/shared/ui/protected-route';
 import { PublicOnlyRoute } from '@/shared/ui/public-only-route';
+import { CardModal } from '@/widgets/card-modal';
 import { AppLayout } from './layout/app-layout';
 import { AuthLayout } from './layout/auth-layout';
 
@@ -22,7 +23,9 @@ export function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/boards/:id" element={<BoardPage />} />
+          <Route path="/boards/:id" element={<BoardPage />}>
+            <Route path="cards/:cardId" element={<CardModal />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />

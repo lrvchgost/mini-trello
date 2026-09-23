@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom';
 import type { ColumnWithCards } from '@min-trello/shared';
 import { CardItem } from '@/entities/card';
+import { AddCardForm } from '@/features/cards';
 import { ColumnHeader } from '@/entities/column';
 import { byOrder } from '@/shared/lib/order';
 
@@ -24,11 +26,17 @@ export function BoardColumn({ column }: BoardColumnProps) {
         <ul className="flex flex-col gap-2">
           {cards.map((card) => (
             <li key={card.id}>
-              <CardItem card={card} />
+              <Link
+                to={`cards/${card.id}`}
+                className="block rounded-lg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <CardItem card={card} />
+              </Link>
             </li>
           ))}
         </ul>
       )}
+      <AddCardForm boardId={column.boardId} columnId={column.id} />
     </section>
   );
 }

@@ -120,10 +120,12 @@ describe('BoardPage', () => {
     expect(await screen.findByText('Доска не найдена')).toBeInTheDocument();
   });
 
-  it('shows an empty state when the board has no columns', async () => {
+  it('shows the column composer when the board has no columns', async () => {
     mocks.api.get.mockReturnValue(mockJson({ ...boardJson, columns: [] }));
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('В доске нет колонок')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /добавить колонку/i })).toBeInTheDocument(),
+    );
   });
 });

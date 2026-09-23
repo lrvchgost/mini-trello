@@ -1,8 +1,9 @@
 import { DragDropContext } from '@hello-pangea/dnd';
 import { ArrowLeftIcon, LayoutGridIcon } from 'lucide-react';
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Outlet, useParams } from 'react-router-dom';
 import { useBoardQuery } from '@/entities/board';
+import { AddColumnForm } from '@/features/boards';
 import { extractApiError } from '@/shared/lib/errors';
 import { byOrder } from '@/shared/lib/order';
 import { Button } from '@/shared/ui/button';
@@ -54,23 +55,23 @@ export function BoardPage() {
         </p>
       ) : null}
 
-      {data && columns.length === 0 ? (
-        <EmptyState
-          icon={<LayoutGridIcon />}
-          title="В доске нет колонок"
-          description="Колонки появятся здесь, когда будут созданы."
-        />
-      ) : null}
-
-      {data && columns.length > 0 ? (
+      {data ? (
         <DragDropContext onDragEnd={() => undefined}>
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="flex items-start gap-4 overflow-x-auto pb-2">
             {columns.map((column) => (
               <BoardColumn key={column.id} column={column} />
             ))}
+            {columns.length === 0 ? (
+              <p className="w-72 shrink-0 self-center rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                Колонок пока нет. Создайте первую — карточки добавите внутри.
+              </p>
+            ) : null}
+            {id ? <AddColumnForm boardId={id} /> : null}
           </div>
         </DragDropContext>
       ) : null}
+
+      <Outlet />
     </div>
   );
 }
