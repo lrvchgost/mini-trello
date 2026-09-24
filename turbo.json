@@ -20,14 +20,31 @@
     },
     "test:e2e": {
       "dependsOn": ["build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "DATABASE_URL_TEST",
+        "REDIS_URL",
+        "JWT_SECRET",
+        "CORS_ORIGIN"
+      ]
     },
     "test:cov": {
       "dependsOn": ["build"]
     },
     "e2e": {
       "dependsOn": ["build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "DATABASE_URL_TEST",
+        "REDIS_URL",
+        "JWT_SECRET",
+        "CORS_ORIGIN",
+        "PLAYWRIGHT_CHANNEL",
+        "E2E_BACKEND_PORT",
+        "E2E_FRONTEND_ORIGIN"
+      ]
     }
   }
 }
