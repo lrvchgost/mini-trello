@@ -74,7 +74,7 @@ pnpm --filter @min-trello/backend test:cov
 
 **Цель:** сквозные сценарии на seed-данных в CI.
 
-**Артефакты:** `e2e/*.spec.ts`, `playwright.config.ts` (`webServer`), `e2e/auth.setup.ts` (storageState).
+**Артефакты:** `apps/frontend/e2e/*.spec.ts`, `apps/frontend/playwright.config.ts` (`webServer`, Chrome `channel`), `e2e/auth.setup.ts` (storageState), `e2e/global-setup.ts` (reset тестовой БД), `.env.e2e`.
 
 **Зависимости:** 4.1, 5.x.
 
@@ -90,7 +90,7 @@ pnpm --filter @min-trello/backend test:cov
 **Команда проверки:**
 ```bash
 pnpm e2e
-pnpm exec playwright show-report
+pnpm e2e:report
 ```
 
 **DoD:** 5 ключевых сценариев зелёные, воспроизводимы, не флакают на повторном прогоне.

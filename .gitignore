@@ -34,3 +34,6 @@ pnpm-debug.log*
 
 # storybook
 storybook-static/
+
+# playwright auth state
+**/e2e/.auth/

@@ -18,7 +18,9 @@
     "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "db:seed": "dotenv -e ../../.env -- prisma db seed",
-    "test:seed": "dotenv -e ../../.env -- ts-node prisma/seed.check.ts"
+    "test:seed": "dotenv -e ../../.env -- ts-node prisma/seed.check.ts",
+    "e2e:db:reset": "prisma migrate reset --force",
+    "e2e:serve": "prisma migrate deploy && node dist/main.js"
   },
   "dependencies": {
     "@min-trello/shared": "workspace:*",

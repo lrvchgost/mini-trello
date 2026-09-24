@@ -43,6 +43,23 @@ pnpm db:migrate   # Prisma миграции
 pnpm db:seed      # предзаполненные пользователи
 ```
 
+## Тесты
+
+```bash
+pnpm lint && pnpm format:check && pnpm typecheck
+pnpm test                                              # unit (Jest + Vitest)
+pnpm --filter @min-trello/backend test:e2e             # integration (DATABASE_URL_TEST)
+
+docker compose -f docker-compose.dev.yml up -d         # Postgres + Redis для e2e
+pnpm e2e                                               # Playwright (Chrome installed)
+pnpm e2e:report                                        # HTML-отчёт
+```
+
+E2E поднимает изолированный стек сам: backend на `:3001` с тестовой БД
+(`DATABASE_URL_TEST`), frontend на `:5174` (`vite --mode e2e`, см. `.env.e2e`).
+Перед прогоном тестовая БД сбрасывается и засеивается (`prisma migrate reset`).
+Нужен установленный Google Chrome (`channel: chrome`).
+
 ## Принятые решения
 
 | Решение | Альтернатива | Почему выбрано |

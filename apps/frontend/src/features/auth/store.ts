@@ -38,7 +38,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   ...initialAuthState,
 
   login: async (input) => {
-    set({ status: 'loading', error: null });
+    // Keep the auth screen mounted while the request is in flight: flipping the
+    // global status to 'loading' would make PublicOnlyRoute unmount the form and
+    // drop any validation/server error set from the rejected promise.
+    set({ error: null });
     try {
       const session = await api.post('auth/login', { json: input }).json<AuthResponse>();
       setAccessToken(session.accessToken);
@@ -51,7 +54,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   register: async (input) => {
-    set({ status: 'loading', error: null });
+    set({ error: null });
     try {
       const session = await api.post('auth/register', { json: input }).json<AuthResponse>();
       setAccessToken(session.accessToken);

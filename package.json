@@ -27,7 +27,8 @@
     "test:seed": "pnpm --filter @min-trello/backend test:seed",
     "prepare": "husky",
     "storybook": "pnpm --filter @min-trello/frontend storybook",
-    "build-storybook": "pnpm --filter @min-trello/frontend build-storybook"
+    "build-storybook": "pnpm --filter @min-trello/frontend build-storybook",
+    "e2e:report": "pnpm --filter @min-trello/frontend e2e:report"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",

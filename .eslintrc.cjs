@@ -12,7 +12,15 @@ module.exports = {
   },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
-  ignorePatterns: ['node_modules/', 'dist/', 'build/', 'coverage/', '.turbo/', 'pnpm-lock.yaml'],
+  ignorePatterns: [
+    'node_modules/',
+    'dist/',
+    'build/',
+    'coverage/',
+    '.turbo/',
+    'pnpm-lock.yaml',
+    'apps/frontend/e2e/.auth/',
+  ],
   rules: {
     '@typescript-eslint/no-unused-vars': [
       'warn',
@@ -36,6 +44,13 @@ module.exports = {
       rules: {
         'react/react-in-jsx-scope': 'off',
         'react/prop-types': 'off',
+      },
+    },
+    {
+      files: ['apps/frontend/e2e/**/*.ts', 'apps/frontend/playwright.config.ts'],
+      env: {
+        browser: false,
+        node: true,
       },
     },
   ],
