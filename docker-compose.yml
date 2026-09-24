@@ -1,0 +1,91 @@
+name: min-trello
+
+# Production-like stack: `docker compose up` (from the repo root, no -f) builds the
+# images, applies migrations, idempotently seeds demo data and serves everything
+# through the edge nginx on http://localhost.
+#
+# Every value has a container-internal default, so no `.env` is required. Because
+# the repository's local-dev `.env` points at `localhost`, the container-specific
+# knobs use the `MIN_TRELLO_*` prefix: add them to `.env` (or export them) to
+# override the stack without clashing with local development.
+services:
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        # Vite bakes VITE_* at build time; production is same-origin via edge nginx.
+        VITE_API_URL: ${MIN_TRELLO_VITE_API_URL:-/api}
+        VITE_WS_URL: ${MIN_TRELLO_VITE_WS_URL:-/}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${MIN_TRELLO_DATABASE_URL:-postgresql://postgres:postgres@db:5432/min_trello}
+      REDIS_URL: ${MIN_TRELLO_REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      REFRESH_GRACE_SECONDS: ${REFRESH_GRACE_SECONDS:-60}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGIN: ${MIN_TRELLO_CORS_ORIGIN:-http://localhost}
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-min_trello}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-min_trello}
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:

@@ -1,0 +1,28 @@
+# dependencies / build output from the host (rebuilt inside the image)
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+
+# tests / reports
+**/coverage
+**/test-results
+**/playwright-report
+**/blob-report
+**/playwright/.cache
+**/storybook-static
+
+# local env & secrets (baked defaults live in docker-compose.yml)
+.env
+.env.*
+!.env.example
+
+# vcs / editors / misc
+.git
+.github
+.vscode
+.idea
+**/*.log
+docs
+results
+README.md
