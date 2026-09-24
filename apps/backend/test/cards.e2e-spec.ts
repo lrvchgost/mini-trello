@@ -1,15 +1,14 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
-
-interface Session {
-  token: string;
-  userId: string;
-}
+import {
+  createBoard,
+  createCard,
+  createColumn,
+  createTestApp,
+  registerUser,
+  truncateAllTables,
+  type TestApp,
+  type TestSession,
+} from './utils';
 
 interface BoardColumn {
   id: string;
@@ -17,71 +16,22 @@ interface BoardColumn {
 }
 
 describe('Cards (e2e)', () => {
-  let app: INestApplication;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    testApp = await createTestApp();
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
-  async function register(email: string): Promise<Session> {
-    const response = await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, name: email.split('@')[0], password: 'password123' })
-      .expect(201);
-
-    return {
-      token: response.body.accessToken as string,
-      userId: (response.body.user as { id: string }).id,
-    };
-  }
-
-  async function createBoard(session: Session, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/boards')
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body.id as string;
-  }
-
-  async function createColumn(session: Session, boardId: string, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/columns`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body.id as string;
-  }
-
-  async function createCard(
-    session: Session,
-    columnId: string,
-    title: string,
-  ): Promise<{ id: string; order: number }> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/columns/${columnId}/cards`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body as { id: string; order: number };
-  }
-
-  async function boardColumns(session: Session, boardId: string): Promise<BoardColumn[]> {
-    const response = await request(app.getHttpServer())
+  async function boardColumns(session: TestSession, boardId: string): Promise<BoardColumn[]> {
+    const response = await request(testApp.app.getHttpServer())
       .get(`/api/boards/${boardId}`)
       .set('Authorization', `Bearer ${session.token}`)
       .expect(200);
@@ -93,27 +43,27 @@ describe('Cards (e2e)', () => {
   }
 
   it('rejects requests without an access token', async () => {
-    await request(app.getHttpServer()).get('/api/cards/x').expect(401);
+    await request(testApp.app.getHttpServer()).get('/api/cards/x').expect(401);
   });
 
   it('creates cards with sequential order 0, 1', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
 
-    const first = await createCard(alice, columnId, 'First');
-    const second = await createCard(alice, columnId, 'Second');
+    const first = await createCard(testApp.app, alice, column.id, 'First');
+    const second = await createCard(testApp.app, alice, column.id, 'Second');
 
     expect([first.order, second.order]).toEqual([0, 1]);
   });
 
   it('returns a card with assignee and labels', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'First');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .get(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
@@ -128,12 +78,12 @@ describe('Cards (e2e)', () => {
   });
 
   it('updates a card', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'First');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ title: 'Renamed', priority: 'high', description: 'Details' })
@@ -148,25 +98,25 @@ describe('Cards (e2e)', () => {
   });
 
   it('rejects a stale expectedUpdatedAt with 409', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'First');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
 
-    const detail = await request(app.getHttpServer())
+    const detail = await request(testApp.app.getHttpServer())
       .get(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
 
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ title: 'First edit', expectedUpdatedAt: detail.body.updatedAt })
       .expect(200);
 
-    const conflict = await request(app.getHttpServer())
+    const conflict = await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ title: 'Second edit', expectedUpdatedAt: detail.body.updatedAt })
@@ -176,42 +126,42 @@ describe('Cards (e2e)', () => {
   });
 
   it('reorders cards within a column without gaps', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const first = await createCard(alice, columnId, 'First');
-    const second = await createCard(alice, columnId, 'Second');
-    const third = await createCard(alice, columnId, 'Third');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const first = await createCard(testApp.app, alice, column.id, 'First');
+    const second = await createCard(testApp.app, alice, column.id, 'Second');
+    const third = await createCard(testApp.app, alice, column.id, 'Third');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${third.id}/move`)
       .set('Authorization', `Bearer ${alice.token}`)
-      .send({ columnId, order: 0 })
+      .send({ columnId: column.id, order: 0 })
       .expect(200);
 
-    const [column] = await boardColumns(alice, boardId);
-    expect(column!.cards.map((c) => c.id)).toEqual([third.id, first.id, second.id]);
-    expect(column!.cards.map((c) => c.order)).toEqual([0, 1, 2]);
+    const [result] = await boardColumns(alice, board.id);
+    expect(result!.cards.map((c) => c.id)).toEqual([third.id, first.id, second.id]);
+    expect(result!.cards.map((c) => c.order)).toEqual([0, 1, 2]);
   });
 
   it('renumbers both columns when moving a card across them', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const todo = await createColumn(alice, boardId, 'To Do');
-    const doing = await createColumn(alice, boardId, 'Doing');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const todo = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const doing = await createColumn(testApp.app, alice, board.id, 'Doing');
 
-    const todoA = await createCard(alice, todo, 'A');
-    const todoB = await createCard(alice, todo, 'B');
-    const doingX = await createCard(alice, doing, 'X');
-    const doingY = await createCard(alice, doing, 'Y');
+    const todoA = await createCard(testApp.app, alice, todo.id, 'A');
+    const todoB = await createCard(testApp.app, alice, todo.id, 'B');
+    const doingX = await createCard(testApp.app, alice, doing.id, 'X');
+    const doingY = await createCard(testApp.app, alice, doing.id, 'Y');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${todoA.id}/move`)
       .set('Authorization', `Bearer ${alice.token}`)
-      .send({ columnId: doing, order: 1 })
+      .send({ columnId: doing.id, order: 1 })
       .expect(200);
 
-    const columns = await boardColumns(alice, boardId);
+    const columns = await boardColumns(alice, board.id);
     const [todoColumn, doingColumn] = columns;
 
     expect(todoColumn!.cards.map((c) => c.id)).toEqual([todoB.id]);
@@ -221,37 +171,37 @@ describe('Cards (e2e)', () => {
   });
 
   it('moves a card into an empty column', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const todo = await createColumn(alice, boardId, 'To Do');
-    const done = await createColumn(alice, boardId, 'Done');
-    const card = await createCard(alice, todo, 'A');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const todo = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const done = await createColumn(testApp.app, alice, board.id, 'Done');
+    const card = await createCard(testApp.app, alice, todo.id, 'A');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}/move`)
       .set('Authorization', `Bearer ${alice.token}`)
-      .send({ columnId: done, order: 0 })
+      .send({ columnId: done.id, order: 0 })
       .expect(200);
 
-    const [, doneColumn] = await boardColumns(alice, boardId);
+    const [, doneColumn] = await boardColumns(alice, board.id);
     expect(doneColumn!.cards.map((c) => c.id)).toEqual([card.id]);
     expect(doneColumn!.cards.map((c) => c.order)).toEqual([0]);
   });
 
   it('assigns the board owner and clears the assignee', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'First');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
 
-    const assigned = await request(app.getHttpServer())
+    const assigned = await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}/assignee`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ assigneeId: alice.userId })
       .expect(200);
     expect(assigned.body.assigneeId).toBe(alice.userId);
 
-    const cleared = await request(app.getHttpServer())
+    const cleared = await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}/assignee`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ assigneeId: null })
@@ -260,13 +210,13 @@ describe('Cards (e2e)', () => {
   });
 
   it('rejects an assignee that is not the board owner with 422', async () => {
-    const alice = await register('alice@example.com');
-    const bob = await register('bob@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'First');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}/assignee`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ assigneeId: bob.userId })
@@ -276,63 +226,63 @@ describe('Cards (e2e)', () => {
   });
 
   it('deletes a card', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'First');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .delete(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(204);
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .get(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(404);
   });
 
   it("never exposes another user's cards (404)", async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'Private');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const card = await createCard(alice, columnId, 'Secret');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'Private');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'Secret');
 
-    const bob = await register('bob@example.com');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
 
-    const read = await request(app.getHttpServer())
+    const read = await request(testApp.app.getHttpServer())
       .get(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${bob.token}`)
       .expect(404);
     expect(read.body).toMatchObject({ error: 'BOARD_NOT_FOUND' });
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${bob.token}`)
       .send({ title: 'Hacked' })
       .expect(404);
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .delete(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${bob.token}`)
       .expect(404);
   });
 
   it('refuses to move a card into a column of another board (404)', async () => {
-    const alice = await register('alice@example.com');
-    const bob = await register('bob@example.com');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
 
-    const aliceBoard = await createBoard(alice, 'Alice');
-    const aliceColumn = await createColumn(alice, aliceBoard, 'To Do');
-    const card = await createCard(alice, aliceColumn, 'Task');
+    const aliceBoard = await createBoard(testApp.app, alice, 'Alice');
+    const aliceColumn = await createColumn(testApp.app, alice, aliceBoard.id, 'To Do');
+    const card = await createCard(testApp.app, alice, aliceColumn.id, 'Task');
 
-    const bobBoard = await createBoard(bob, 'Bob');
-    const bobColumn = await createColumn(bob, bobBoard, 'To Do');
+    const bobBoard = await createBoard(testApp.app, bob, 'Bob');
+    const bobColumn = await createColumn(testApp.app, bob, bobBoard.id, 'To Do');
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .patch(`/api/cards/${card.id}/move`)
       .set('Authorization', `Bearer ${alice.token}`)
-      .send({ columnId: bobColumn, order: 0 })
+      .send({ columnId: bobColumn.id, order: 0 })
       .expect(404);
 
     expect(response.body).toMatchObject({ error: 'COLUMN_NOT_FOUND' });

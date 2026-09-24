@@ -1,10 +1,10 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * Очистка таблиц между тестами. Служебные таблицы Prisma (`_prisma_migrations`)
- * не трогаем.
+ * Очистка состояния между интеграционными тестами: truncate всех таблиц
+ * приложения. Служебную таблицу Prisma (`_prisma_migrations`) не трогаем.
  */
-export async function truncateAllTables(prisma: PrismaClient): Promise<void> {
+export async function truncateAllTables(prisma: PrismaService): Promise<void> {
   const rows = await prisma.$queryRaw<Array<{ tablename: string }>>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public'
   `;

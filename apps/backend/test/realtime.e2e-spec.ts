@@ -1,16 +1,14 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { io, type Socket } from 'socket.io-client';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
-
-interface Session {
-  token: string;
-  userId: string;
-}
+import {
+  createBoard,
+  createCard,
+  createColumn,
+  createTestApp,
+  registerUser,
+  truncateAllTables,
+  type TestApp,
+} from './utils';
 
 const sockets: Socket[] = [];
 
@@ -54,23 +52,14 @@ function joinBoard(socket: Socket, boardId: string, clientId: string): Promise<v
 }
 
 describe('Realtime (e2e)', () => {
-  let app: INestApplication;
-  let baseUrl: string;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
-    await app.listen(0);
-
-    const address = app.getHttpServer().address();
-    const port = typeof address === 'object' && address ? address.port : 0;
-    baseUrl = `http://127.0.0.1:${port}`;
+    testApp = await createTestApp({ listen: true });
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterEach(() => {
@@ -80,79 +69,40 @@ describe('Realtime (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
-  async function register(email: string): Promise<Session> {
-    const response = await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, name: email.split('@')[0], password: 'password123' })
-      .expect(201);
-
-    return {
-      token: response.body.accessToken as string,
-      userId: (response.body.user as { id: string }).id,
-    };
-  }
-
-  async function createBoard(session: Session, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/boards')
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-    return response.body.id as string;
-  }
-
-  async function createColumn(session: Session, boardId: string, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/columns`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-    return response.body.id as string;
-  }
-
-  async function createCard(session: Session, columnId: string, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/columns/${columnId}/cards`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-    return response.body.id as string;
-  }
-
   it('rejects a connection without an access token', async () => {
-    await expect(connect(baseUrl)).rejects.toThrow();
+    await expect(connect(testApp.baseUrl)).rejects.toThrow();
   });
 
   it('rejects a connection with an invalid token', async () => {
-    await expect(connect(baseUrl, 'not-a-jwt')).rejects.toThrow();
+    await expect(connect(testApp.baseUrl, 'not-a-jwt')).rejects.toThrow();
   });
 
   it("refuses to join another user's board with FORBIDDEN", async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'Private');
-    const bob = await register('bob@example.com');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'Private');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
 
-    const socket = await connect(baseUrl, bob.token);
+    const socket = await connect(testApp.baseUrl, bob.token);
     const errorPromise = waitForEvent<{ code: string }>(socket, 'error');
-    socket.emit('joinBoard', { boardId, clientId: 'tab-b' });
+    socket.emit('joinBoard', { boardId: board.id, clientId: 'tab-b' });
 
     await expect(errorPromise).resolves.toEqual({ code: 'FORBIDDEN' });
   });
 
   it('delivers card.moved from one tab to another on the same board', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const from = await createColumn(alice, boardId, 'To Do');
-    const to = await createColumn(alice, boardId, 'Done');
-    const cardId = await createCard(alice, from, 'First task');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const from = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const to = await createColumn(testApp.app, alice, board.id, 'Done');
+    const card = await createCard(testApp.app, alice, from.id, 'First task');
 
-    const tabA = await connect(baseUrl, alice.token);
-    const tabB = await connect(baseUrl, alice.token);
-    await joinBoard(tabA, boardId, 'tab-a');
-    await joinBoard(tabB, boardId, 'tab-b');
+    const tabA = await connect(testApp.baseUrl, alice.token);
+    const tabB = await connect(testApp.baseUrl, alice.token);
+    await joinBoard(tabA, board.id, 'tab-a');
+    await joinBoard(tabB, board.id, 'tab-b');
 
     const received = waitForEvent<{
       cardId: string;
@@ -162,16 +112,16 @@ describe('Realtime (e2e)', () => {
       clientId: string;
     }>(tabB, 'card.moved');
 
-    await request(app.getHttpServer())
-      .patch(`/api/cards/${cardId}/move`)
+    await request(testApp.app.getHttpServer())
+      .patch(`/api/cards/${card.id}/move`)
       .set('Authorization', `Bearer ${alice.token}`)
       .set('X-Client-Id', 'tab-a')
-      .send({ columnId: to, order: 0 })
+      .send({ columnId: to.id, order: 0 })
       .expect(200);
 
     await expect(received).resolves.toEqual({
-      cardId,
-      targetColumnId: to,
+      cardId: card.id,
+      targetColumnId: to.id,
       newOrder: 0,
       actorId: alice.userId,
       clientId: 'tab-a',

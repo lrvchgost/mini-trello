@@ -1,31 +1,23 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
+import { createTestApp, truncateAllTables, type TestApp } from './utils';
 
 describe('Application (e2e)', () => {
-  let app: INestApplication;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    testApp = await createTestApp();
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
   it('GET /api/health reports ok with db up', async () => {
-    const response = await request(app.getHttpServer()).get('/api/health').expect(200);
+    const response = await request(testApp.app.getHttpServer()).get('/api/health').expect(200);
 
     expect(response.body).toMatchObject({
       status: 'ok',
@@ -34,11 +26,11 @@ describe('Application (e2e)', () => {
   });
 
   it('GET /api/docs serves Swagger UI', async () => {
-    await request(app.getHttpServer()).get('/api/docs').expect(200);
+    await request(testApp.app.getHttpServer()).get('/api/docs').expect(200);
   });
 
   it('unknown route returns 404 in ApiError format', async () => {
-    const response = await request(app.getHttpServer()).get('/api/unknown').expect(404);
+    const response = await request(testApp.app.getHttpServer()).get('/api/unknown').expect(404);
 
     expect(response.body).toMatchObject({ statusCode: 404, error: 'NOT_FOUND' });
   });

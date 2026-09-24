@@ -1,10 +1,5 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
+import { createTestApp, registerUser, truncateAllTables, type TestApp } from './utils';
 
 const credentials = {
   email: 'alice@example.com',
@@ -13,25 +8,22 @@ const credentials = {
 };
 
 describe('Auth (e2e)', () => {
-  let app: INestApplication;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    testApp = await createTestApp();
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
   it('registers, refreshes without login, and logs out', async () => {
-    const agent = request.agent(app.getHttpServer());
+    const agent = request.agent(testApp.app.getHttpServer());
 
     const registered = await agent.post('/api/auth/register').send(credentials).expect(201);
     expect(registered.body).toMatchObject({
@@ -55,13 +47,13 @@ describe('Auth (e2e)', () => {
   });
 
   it('rejects requests without an access token', async () => {
-    await request(app.getHttpServer()).get('/api/auth/me').expect(401);
+    await request(testApp.app.getHttpServer()).get('/api/auth/me').expect(401);
   });
 
   it('returns 409 EMAIL_TAKEN for a duplicate registration', async () => {
-    await request(app.getHttpServer()).post('/api/auth/register').send(credentials).expect(201);
+    await registerUser(testApp.app, credentials.email, { name: credentials.name });
 
-    const duplicate = await request(app.getHttpServer())
+    const duplicate = await request(testApp.app.getHttpServer())
       .post('/api/auth/register')
       .send(credentials)
       .expect(409);
@@ -70,14 +62,14 @@ describe('Auth (e2e)', () => {
   });
 
   it('logs in with valid credentials and rejects a wrong password', async () => {
-    await request(app.getHttpServer()).post('/api/auth/register').send(credentials).expect(201);
+    await registerUser(testApp.app, credentials.email, { name: credentials.name });
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .post('/api/auth/login')
       .send({ email: credentials.email, password: 'wrong-password' })
       .expect(401);
 
-    const login = await request(app.getHttpServer())
+    const login = await request(testApp.app.getHttpServer())
       .post('/api/auth/login')
       .send({ email: credentials.email, password: credentials.password })
       .expect(200);

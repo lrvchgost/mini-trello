@@ -1,7 +1,7 @@
 import { firstValueFrom, take } from 'rxjs';
 import type { ActivityLog } from '@min-trello/shared';
 import type { RedisService } from '../redis/redis.service';
-import { ActivityService } from './activity.service';
+import { ActivityService, type ActivityStreamEvent } from './activity.service';
 import type { IActivityRepository } from './repositories/activity.repository';
 
 const entry: ActivityLog = {
@@ -99,5 +99,49 @@ describe('ActivityService', () => {
 
     await expect(service.list('board-1', 1, 20)).resolves.toBe(paginated);
     expect(activityRepo.findByBoard).toHaveBeenCalledWith('board-1', 1, 20);
+  });
+  it('shares one stream across subscribers of the same board', () => {
+    const first = service.stream('board-1').subscribe();
+    const second = service.stream('board-1').subscribe();
+
+    first.unsubscribe();
+    second.unsubscribe();
+  });
+
+  it('emits heartbeat pings and releases streams on destroy', () => {
+    jest.useFakeTimers();
+    const events: ActivityStreamEvent[] = [];
+    const subscription = service.stream('board-1').subscribe((event) => events.push(event));
+
+    jest.advanceTimersByTime(15_000);
+    expect(events).toContainEqual({
+      type: 'ping',
+      data: { timestamp: expect.any(String) },
+    });
+
+    service.onModuleDestroy();
+    subscription.unsubscribe();
+    jest.useRealTimers();
+  });
+
+  it('ignores malformed channels and malformed payloads', async () => {
+    let handler: PmessageHandler = () => undefined;
+    subscriber.on.mockImplementation((_event: string, callback: PmessageHandler) => {
+      handler = callback;
+      return subscriber;
+    });
+
+    await service.onModuleInit();
+
+    const received = firstValueFrom(service.stream('board-1').pipe(take(1)));
+    expect(() => handler('board:*:activity', 'other:board-1', '{}')).not.toThrow();
+    expect(() => handler('board:*:activity', 'board:board-1:activity', 'not-json')).not.toThrow();
+
+    handler('board:*:activity', 'board:board-1:activity', JSON.stringify(entry));
+
+    await expect(received).resolves.toEqual({
+      type: 'activity',
+      data: JSON.parse(JSON.stringify(entry)),
+    });
   });
 });

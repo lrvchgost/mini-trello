@@ -1,104 +1,43 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
-
-interface Session {
-  token: string;
-  userId: string;
-}
+import {
+  createBoard,
+  createCard,
+  createColumn,
+  createLabel,
+  createTestApp,
+  registerUser,
+  truncateAllTables,
+  type TestApp,
+} from './utils';
 
 describe('Labels (e2e)', () => {
-  let app: INestApplication;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    testApp = await createTestApp();
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
-  async function register(email: string): Promise<Session> {
-    const response = await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, name: email.split('@')[0], password: 'password123' })
-      .expect(201);
-
-    return {
-      token: response.body.accessToken as string,
-      userId: (response.body.user as { id: string }).id,
-    };
-  }
-
-  async function createBoard(session: Session, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/boards')
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body.id as string;
-  }
-
-  async function createColumn(session: Session, boardId: string, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/columns`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body.id as string;
-  }
-
-  async function createCard(session: Session, columnId: string, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/columns/${columnId}/cards`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body.id as string;
-  }
-
-  async function createLabel(
-    session: Session,
-    boardId: string,
-    name: string,
-    color?: string,
-  ): Promise<{ id: string; name: string; color: string; boardId: string }> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/labels`)
-      .set('Authorization', `Bearer ${session.token}`)
-      .send(color ? { name, color } : { name })
-      .expect(201);
-
-    return response.body as { id: string; name: string; color: string; boardId: string };
-  }
-
   it('rejects requests without an access token', async () => {
-    await request(app.getHttpServer()).get('/api/boards/x/labels').expect(401);
+    await request(testApp.app.getHttpServer()).get('/api/boards/x/labels').expect(401);
   });
 
   it('creates a label with the default color and lists it', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
 
-    const label = await createLabel(alice, boardId, 'bug');
-    expect(label).toMatchObject({ name: 'bug', color: '#6b7280', boardId });
+    const label = await createLabel(testApp.app, alice, board.id, 'bug');
+    expect(label).toMatchObject({ name: 'bug', color: '#6b7280', boardId: board.id });
 
-    const list = await request(app.getHttpServer())
-      .get(`/api/boards/${boardId}/labels`)
+    const list = await request(testApp.app.getHttpServer())
+      .get(`/api/boards/${board.id}/labels`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
 
@@ -106,13 +45,13 @@ describe('Labels (e2e)', () => {
   });
 
   it('rejects a duplicate label name in the same board (409)', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
 
-    await createLabel(alice, boardId, 'bug');
+    await createLabel(testApp.app, alice, board.id, 'bug');
 
-    const response = await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/labels`)
+    const response = await request(testApp.app.getHttpServer())
+      .post(`/api/boards/${board.id}/labels`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ name: 'bug' })
       .expect(409);
@@ -121,66 +60,66 @@ describe('Labels (e2e)', () => {
   });
 
   it('deletes a label', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const label = await createLabel(alice, boardId, 'bug');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const label = await createLabel(testApp.app, alice, board.id, 'bug');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .delete(`/api/labels/${label.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(204);
 
-    const list = await request(app.getHttpServer())
-      .get(`/api/boards/${boardId}/labels`)
+    const list = await request(testApp.app.getHttpServer())
+      .get(`/api/boards/${board.id}/labels`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
     expect(list.body).toEqual([]);
   });
 
   it('attaches a label to a card and detaches it', async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'My Board');
-    const columnId = await createColumn(alice, boardId, 'To Do');
-    const cardId = await createCard(alice, columnId, 'First');
-    const label = await createLabel(alice, boardId, 'bug', '#f00');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const card = await createCard(testApp.app, alice, column.id, 'First');
+    const label = await createLabel(testApp.app, alice, board.id, 'bug', '#f00');
 
-    const attached = await request(app.getHttpServer())
-      .post(`/api/cards/${cardId}/labels`)
+    const attached = await request(testApp.app.getHttpServer())
+      .post(`/api/cards/${card.id}/labels`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ labelId: label.id })
       .expect(200);
     expect(attached.body.labels).toEqual([label]);
 
-    const detail = await request(app.getHttpServer())
-      .get(`/api/cards/${cardId}`)
+    const detail = await request(testApp.app.getHttpServer())
+      .get(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
     expect(detail.body.labels).toEqual([label]);
 
-    await request(app.getHttpServer())
-      .delete(`/api/cards/${cardId}/labels/${label.id}`)
+    await request(testApp.app.getHttpServer())
+      .delete(`/api/cards/${card.id}/labels/${label.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(204);
 
-    const cleared = await request(app.getHttpServer())
-      .get(`/api/cards/${cardId}`)
+    const cleared = await request(testApp.app.getHttpServer())
+      .get(`/api/cards/${card.id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
     expect(cleared.body.labels).toEqual([]);
   });
 
   it('refuses to attach a label from another board (422)', async () => {
-    const alice = await register('alice@example.com');
-    const aliceBoard = await createBoard(alice, 'Alice');
-    const aliceColumn = await createColumn(alice, aliceBoard, 'To Do');
-    const aliceCard = await createCard(alice, aliceColumn, 'Task');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const aliceBoard = await createBoard(testApp.app, alice, 'Alice');
+    const aliceColumn = await createColumn(testApp.app, alice, aliceBoard.id, 'To Do');
+    const aliceCard = await createCard(testApp.app, alice, aliceColumn.id, 'Task');
 
-    const bob = await register('bob@example.com');
-    const bobBoard = await createBoard(bob, 'Bob');
-    const bobLabel = await createLabel(bob, bobBoard, 'bug');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
+    const bobBoard = await createBoard(testApp.app, bob, 'Bob');
+    const bobLabel = await createLabel(testApp.app, bob, bobBoard.id, 'bug');
 
-    const response = await request(app.getHttpServer())
-      .post(`/api/cards/${aliceCard}/labels`)
+    const response = await request(testApp.app.getHttpServer())
+      .post(`/api/cards/${aliceCard.id}/labels`)
       .set('Authorization', `Bearer ${alice.token}`)
       .send({ labelId: bobLabel.id })
       .expect(422);
@@ -189,19 +128,19 @@ describe('Labels (e2e)', () => {
   });
 
   it("never exposes another user's labels (404)", async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'Private');
-    const label = await createLabel(alice, boardId, 'bug');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'Private');
+    const label = await createLabel(testApp.app, alice, board.id, 'bug');
 
-    const bob = await register('bob@example.com');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
 
-    const list = await request(app.getHttpServer())
-      .get(`/api/boards/${boardId}/labels`)
+    const list = await request(testApp.app.getHttpServer())
+      .get(`/api/boards/${board.id}/labels`)
       .set('Authorization', `Bearer ${bob.token}`)
       .expect(404);
     expect(list.body).toMatchObject({ error: 'BOARD_NOT_FOUND' });
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .delete(`/api/labels/${label.id}`)
       .set('Authorization', `Bearer ${bob.token}`)
       .expect(404);

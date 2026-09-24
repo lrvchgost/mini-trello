@@ -1,95 +1,62 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
+import {
+  createBoard,
+  createColumn,
+  createTestApp,
+  registerUser,
+  truncateAllTables,
+  type TestApp,
+  type TestSession,
+} from './utils';
 
 describe('Columns (e2e)', () => {
-  let app: INestApplication;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    testApp = await createTestApp();
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
-  async function register(email: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({ email, name: email.split('@')[0], password: 'password123' })
-      .expect(201);
-
-    return response.body.accessToken as string;
-  }
-
-  async function createBoard(token: string, title: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/boards')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body.id as string;
-  }
-
-  async function createColumn(
-    token: string,
-    boardId: string,
-    title: string,
-  ): Promise<{ id: string; order: number }> {
-    const response = await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/columns`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ title })
-      .expect(201);
-
-    return response.body as { id: string; order: number };
-  }
-
-  async function boardColumnIds(token: string, boardId: string): Promise<string[]> {
-    const response = await request(app.getHttpServer())
+  async function boardColumnIds(session: TestSession, boardId: string): Promise<string[]> {
+    const response = await request(testApp.app.getHttpServer())
       .get(`/api/boards/${boardId}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${session.token}`)
       .expect(200);
 
     return (response.body.columns as Array<{ id: string }>).map((column) => column.id);
   }
 
   it('rejects requests without an access token', async () => {
-    await request(app.getHttpServer()).post('/api/boards/x/columns').expect(401);
+    await request(testApp.app.getHttpServer()).post('/api/boards/x/columns').expect(401);
   });
 
   it('creates three columns with sequential order 0, 1, 2', async () => {
-    const token = await register('alice@example.com');
-    const boardId = await createBoard(token, 'My Board');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
 
-    const first = await createColumn(token, boardId, 'To Do');
-    const second = await createColumn(token, boardId, 'In Progress');
-    const third = await createColumn(token, boardId, 'Done');
+    const first = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const second = await createColumn(testApp.app, alice, board.id, 'In Progress');
+    const third = await createColumn(testApp.app, alice, board.id, 'Done');
 
     expect([first.order, second.order, third.order]).toEqual([0, 1, 2]);
-    expect(await boardColumnIds(token, boardId)).toEqual([first.id, second.id, third.id]);
+    expect(await boardColumnIds(alice, board.id)).toEqual([first.id, second.id, third.id]);
   });
 
   it('updates a column title and isDone flag', async () => {
-    const token = await register('alice@example.com');
-    const boardId = await createBoard(token, 'My Board');
-    const column = await createColumn(token, boardId, 'To Do');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
 
-    const updated = await request(app.getHttpServer())
+    const updated = await request(testApp.app.getHttpServer())
       .patch(`/api/columns/${column.id}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .send({ title: 'Done', isDone: true })
       .expect(200);
 
@@ -97,47 +64,47 @@ describe('Columns (e2e)', () => {
   });
 
   it('reorders columns without gaps or duplicates', async () => {
-    const token = await register('alice@example.com');
-    const boardId = await createBoard(token, 'My Board');
-    const first = await createColumn(token, boardId, 'To Do');
-    const second = await createColumn(token, boardId, 'In Progress');
-    const third = await createColumn(token, boardId, 'Done');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const first = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const second = await createColumn(testApp.app, alice, board.id, 'In Progress');
+    const third = await createColumn(testApp.app, alice, board.id, 'Done');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/columns/${third.id}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .send({ order: 0 })
       .expect(200);
 
-    expect(await boardColumnIds(token, boardId)).toEqual([third.id, first.id, second.id]);
+    expect(await boardColumnIds(alice, board.id)).toEqual([third.id, first.id, second.id]);
 
-    const reordered = await request(app.getHttpServer())
-      .get(`/api/boards/${boardId}`)
-      .set('Authorization', `Bearer ${token}`)
+    const reordered = await request(testApp.app.getHttpServer())
+      .get(`/api/boards/${board.id}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
     const orders = (reordered.body.columns as Array<{ order: number }>).map((c) => c.order);
     expect(orders).toEqual([0, 1, 2]);
   });
 
   it('deletes a column', async () => {
-    const token = await register('alice@example.com');
-    const boardId = await createBoard(token, 'My Board');
-    const column = await createColumn(token, boardId, 'To Do');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .delete(`/api/columns/${column.id}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .expect(204);
 
-    expect(await boardColumnIds(token, boardId)).toEqual([]);
+    expect(await boardColumnIds(alice, board.id)).toEqual([]);
   });
 
   it('returns 404 for a non-existent column', async () => {
-    const token = await register('alice@example.com');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .patch('/api/columns/clzzzzzzzzzzzzzzzzzzzzzzz')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .send({ title: 'Ghost' })
       .expect(404);
 
@@ -145,11 +112,11 @@ describe('Columns (e2e)', () => {
   });
 
   it('returns 404 when creating a column in a non-existent board', async () => {
-    const token = await register('alice@example.com');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .post('/api/boards/clzzzzzzzzzzzzzzzzzzzzzzz/columns')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .send({ title: 'Orphan' })
       .expect(404);
 
@@ -157,29 +124,29 @@ describe('Columns (e2e)', () => {
   });
 
   it("never exposes another user's columns (404)", async () => {
-    const alice = await register('alice@example.com');
-    const boardId = await createBoard(alice, 'Private');
-    const column = await createColumn(alice, boardId, 'To Do');
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'Private');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
 
-    const bob = await register('bob@example.com');
+    const bob = await registerUser(testApp.app, 'bob@example.com');
 
-    await request(app.getHttpServer())
-      .post(`/api/boards/${boardId}/columns`)
-      .set('Authorization', `Bearer ${bob}`)
+    await request(testApp.app.getHttpServer())
+      .post(`/api/boards/${board.id}/columns`)
+      .set('Authorization', `Bearer ${bob.token}`)
       .send({ title: 'Intruder' })
       .expect(404);
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .patch(`/api/columns/${column.id}`)
-      .set('Authorization', `Bearer ${bob}`)
+      .set('Authorization', `Bearer ${bob.token}`)
       .send({ title: 'Hacked' })
       .expect(404);
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .delete(`/api/columns/${column.id}`)
-      .set('Authorization', `Bearer ${bob}`)
+      .set('Authorization', `Bearer ${bob.token}`)
       .expect(404);
 
-    expect(await boardColumnIds(alice, boardId)).toEqual([column.id]);
+    expect(await boardColumnIds(alice, board.id)).toEqual([column.id]);
   });
 });

@@ -1,10 +1,5 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { configureApp } from '../src/setup-app';
-import { truncateAllTables } from './truncate';
+import { createTestApp, registerUser, truncateAllTables, type TestApp } from './utils';
 
 const credentials = {
   email: 'alice@example.com',
@@ -13,42 +8,30 @@ const credentials = {
 };
 
 describe('Users (e2e)', () => {
-  let app: INestApplication;
+  let testApp: TestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
+    testApp = await createTestApp();
   });
 
   beforeEach(async () => {
-    await truncateAllTables(app.get(PrismaService));
+    await truncateAllTables(testApp.prisma);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
-  async function register(): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send(credentials)
-      .expect(201);
-
-    return response.body.accessToken as string;
-  }
-
   it('rejects requests without an access token', async () => {
-    await request(app.getHttpServer()).get('/api/users').expect(401);
+    await request(testApp.app.getHttpServer()).get('/api/users').expect(401);
   });
 
   it('returns only the current user without a password', async () => {
-    const token = await register();
+    const alice = await registerUser(testApp.app, credentials.email, { name: credentials.name });
 
-    const response = await request(app.getHttpServer())
+    const response = await request(testApp.app.getHttpServer())
       .get('/api/users')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
 
     expect(response.body).toHaveLength(1);
@@ -57,26 +40,26 @@ describe('Users (e2e)', () => {
   });
 
   it('updates the profile name', async () => {
-    const token = await register();
+    const alice = await registerUser(testApp.app, credentials.email, { name: credentials.name });
 
-    const updated = await request(app.getHttpServer())
+    const updated = await request(testApp.app.getHttpServer())
       .patch('/api/users/me')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .send({ name: 'Alice Cooper' })
       .expect(200);
 
     expect(updated.body).toMatchObject({ name: 'Alice Cooper' });
     expect(updated.body).not.toHaveProperty('password');
 
-    const list = await request(app.getHttpServer())
+    const list = await request(testApp.app.getHttpServer())
       .get('/api/users')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
     expect(list.body[0]).toMatchObject({ name: 'Alice Cooper' });
   });
 
   it('changes the password and invalidates existing refresh tokens', async () => {
-    const agent = request.agent(app.getHttpServer());
+    const agent = request.agent(testApp.app.getHttpServer());
     const registered = await agent.post('/api/auth/register').send(credentials).expect(201);
     const token = registered.body.accessToken as string;
 
@@ -94,12 +77,12 @@ describe('Users (e2e)', () => {
 
     await agent.post('/api/auth/refresh').expect(401);
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .post('/api/auth/login')
       .send({ email: credentials.email, password: 'newPassword123' })
       .expect(200);
 
-    await request(app.getHttpServer())
+    await request(testApp.app.getHttpServer())
       .post('/api/auth/login')
       .send({ email: credentials.email, password: credentials.password })
       .expect(401);
