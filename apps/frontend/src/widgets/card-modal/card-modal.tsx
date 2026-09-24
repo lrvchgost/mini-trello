@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { cardQueryKeys, useCardQuery } from '@/entities/card';
-import { AssigneeSelect } from '@/features/cards';
+import { AssigneeSelect, ColumnSelect } from '@/features/cards';
 import { CommentSection } from '@/features/comments';
 import { LabelPicker } from '@/features/labels';
 import { extractApiError } from '@/shared/lib/errors';
@@ -67,6 +67,7 @@ export function CardModal() {
                 }
               />
               <aside className="space-y-5 lg:border-l lg:pl-6">
+                <ColumnSelect cardId={card.id} boardId={boardId} columnId={card.columnId} />
                 <AssigneeSelect cardId={card.id} boardId={boardId} assigneeId={card.assigneeId} />
                 <LabelPicker boardId={boardId} cardId={card.id} labels={card.labels} />
               </aside>

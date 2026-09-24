@@ -70,6 +70,36 @@ const usersJson = [
 
 const labelsJson = [{ id: 'clx000000000000000000401', name: 'bug', color: '#ff0000', boardId }];
 
+const boardJson = {
+  id: boardId,
+  title: 'Доска',
+  ownerId: userId,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  columns: [
+    {
+      id: 'clx000000000000000000201',
+      title: 'В работе',
+      isDone: false,
+      order: 0,
+      boardId,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      cards: [],
+    },
+    {
+      id: 'clx000000000000000000202',
+      title: 'Готово',
+      isDone: true,
+      order: 1,
+      boardId,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      cards: [],
+    },
+  ],
+};
+
 const commentsJson = {
   items: [
     {
@@ -118,6 +148,7 @@ describe('CardModal', () => {
 
     mocks.api.get.mockImplementation((url: string) => {
       if (url === `cards/${cardId}`) return jsonResponse(cardDetailJson);
+      if (url === `boards/${boardId}`) return jsonResponse(boardJson);
       if (url === 'users') return jsonResponse(usersJson);
       if (url === `boards/${boardId}/labels`) return jsonResponse(labelsJson);
       if (url === `cards/${cardId}/comments`) return jsonResponse(commentsJson);
@@ -157,6 +188,25 @@ describe('CardModal', () => {
       ),
     );
     expect(await screen.findByText('Изменения сохранены')).toBeInTheDocument();
+  });
+
+  it('moves the card to another column via the column select', async () => {
+    mocks.api.patch.mockReturnValue(
+      jsonResponse({ columnId: 'clx000000000000000000202', order: 0 }),
+    );
+    renderModal();
+
+    const select = await screen.findByLabelText('Колонка');
+    await waitFor(() => expect(select).toHaveValue(cardDetailJson.columnId));
+
+    fireEvent.change(select, { target: { value: 'clx000000000000000000202' } });
+
+    await waitFor(() =>
+      expect(mocks.api.patch).toHaveBeenCalledWith(
+        `cards/${cardId}/move`,
+        expect.objectContaining({ json: { columnId: 'clx000000000000000000202', order: 0 } }),
+      ),
+    );
   });
 
   it('closes to the board when the dialog requests to close', async () => {
