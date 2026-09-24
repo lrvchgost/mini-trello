@@ -8,6 +8,10 @@ name: min-trello
 # the repository's local-dev `.env` points at `localhost`, the container-specific
 # knobs use the `MIN_TRELLO_*` prefix: add them to `.env` (or export them) to
 # override the stack without clashing with local development.
+#
+# `image:` names the registry artifact published by the Deploy workflow (GHCR);
+# since `build:` is also set, a plain `docker compose up` builds locally while
+# `docker compose pull` on a host fetches the CI-built image.
 services:
   nginx:
     image: nginx:alpine
@@ -23,6 +27,7 @@ services:
         condition: service_healthy
 
   frontend:
+    image: ${MIN_TRELLO_FRONTEND_IMAGE:-ghcr.io/lrvchgost/mini-trello/frontend:latest}
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
@@ -36,6 +41,7 @@ services:
         condition: service_started
 
   backend:
+    image: ${MIN_TRELLO_BACKEND_IMAGE:-ghcr.io/lrvchgost/mini-trello/backend:latest}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
