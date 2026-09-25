@@ -269,3 +269,4 @@ min-trello/
 | Recharts | Chart.js | React-friendly, декларативный, `ResponsiveContainer` |
 | winston | pino | Привычнее команде (опционально: Pino быстрее) |
 | Ownership-only, assignee = владелец | board members | Нет требования на коллаборацию — проще guard и схема ([ADR-008](docs/decisions/adr-008-ownership-only-access.md)) |
+| Advisory-локи + retry для move | Только retry / FOR UPDATE | Исключает дедлок конкурентных переносов (500 → 409), короткая очередь вместо 1s deadlock_timeout ([ADR-009](docs/decisions/adr-009-concurrent-card-moves.md)) |

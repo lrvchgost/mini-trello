@@ -60,11 +60,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      const stack = exception instanceof Error ? exception.stack : undefined;
-      this.logger.error(message, 'ExceptionFilter', stack);
+      this.logger.error(
+        `${message} (${this.describeCause(exception)})`,
+        'ExceptionFilter',
+        exception,
+      );
     }
 
     response.status(statusCode).json(body);
+  }
+
+  /** Короткая причина для лога: имя и код ошибки (Prisma/PostgreSQL), не теряя стек. */
+  private describeCause(exception: unknown): string {
+    if (exception instanceof Error) {
+      const code = (exception as { code?: unknown }).code;
+      return code === undefined ? exception.name : `${exception.name} ${String(code)}`;
+    }
+    return typeof exception === 'string' ? exception : typeof exception;
   }
 
   private describe(exception: unknown): DescribedError {

@@ -16,6 +16,7 @@ import type {
 } from '@min-trello/shared';
 import { ActivityService } from '../activity/activity.service';
 import { ErrorCode } from '../common/errors';
+import { isWriteConflictError } from '../common/prisma-errors';
 import {
   COLUMN_REPOSITORY_TOKEN,
   type IColumnRepository,
@@ -115,7 +116,22 @@ export class CardsService {
       });
     }
 
-    const card = await this.cardRepo.move(id, input.columnId, input.order);
+    let card: Card;
+    try {
+      card = await this.cardRepo.move(id, input.columnId, input.order);
+    } catch (error) {
+      // Конфликт параллельной записи после исчерпания ретраев репозитория —
+      // клиентская ситуация, а не 500: фронт откатит optimistic-обновление
+      // и подтянет актуальный порядок.
+      if (isWriteConflictError(error)) {
+        throw new ConflictException({
+          error: ErrorCode.CONFLICT,
+          message: 'Card move conflict, please retry',
+        });
+      }
+      throw error;
+    }
+
     await this.logActivity(
       boardId,
       'card.moved',
