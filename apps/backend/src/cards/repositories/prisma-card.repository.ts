@@ -1,9 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Card, CardDetail, CreateCardInput, UpdateCardInput } from '@min-trello/shared';
+import { isWriteConflictError } from '../../common/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { planCardMove } from '../reorder.util';
 import type { ICardRepository } from './card.repository';
+
+const MOVE_RETRY_ATTEMPTS = 3;
+const MOVE_RETRY_MIN_DELAY_MS = 50;
+const MOVE_RETRY_MAX_DELAY_MS = 150;
+
+function delayMoveRetry(): Promise<void> {
+  const span = MOVE_RETRY_MAX_DELAY_MS - MOVE_RETRY_MIN_DELAY_MS;
+  const delay = MOVE_RETRY_MIN_DELAY_MS + Math.floor(Math.random() * span);
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
 
 const assigneeSelect = {
   id: true,
@@ -82,25 +93,73 @@ export class PrismaCardRepository implements ICardRepository {
     return this.prisma.card.findUniqueOrThrow({ where: { id } });
   }
 
-  move(cardId: string, targetColumnId: string, targetOrder: number): Promise<Card> {
-    return this.prisma.$transaction(async (tx) => {
-      const card = await tx.card.findUniqueOrThrow({ where: { id: cardId } });
-      const fromColumnId = card.columnId;
+  /**
+   * Перенос карточки. Параллельные переносы одних и тех же колонок сериализуются
+   * advisory-локами PostgreSQL (`pg_advisory_xact_lock` по columnId, захваченным
+   * в отсортированном порядке) — дедлок между двухфазными перенормировками
+   * становится невозможен, конкуренты коротко ждут очереди. Остаточные конфликты
+   * записи (P2034/дедлок) ретраятся ограниченное число раз; после исчерпания
+   * ошибку получает сервис и отвечает 409.
+   */
+  async move(cardId: string, targetColumnId: string, targetOrder: number): Promise<Card> {
+    let lastError: unknown;
 
-      const targetIds = await this.orderedIds(tx, targetColumnId);
-      const sourceIds =
-        fromColumnId === targetColumnId ? targetIds : await this.orderedIds(tx, fromColumnId);
-
-      const plan = planCardMove(sourceIds, targetIds, cardId, targetOrder);
-
-      if (fromColumnId !== targetColumnId) {
-        await tx.card.update({ where: { id: cardId }, data: { columnId: targetColumnId } });
-        await this.applyOrder(tx, plan.sourceIds);
+    for (let attempt = 1; attempt <= MOVE_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) =>
+          this.moveOnce(tx, cardId, targetColumnId, targetOrder),
+        );
+      } catch (error) {
+        lastError = error;
+        if (!isWriteConflictError(error) || attempt === MOVE_RETRY_ATTEMPTS) {
+          throw error;
+        }
+        await delayMoveRetry();
       }
-      await this.applyOrder(tx, plan.targetIds);
+    }
 
-      return tx.card.findUniqueOrThrow({ where: { id: cardId } });
-    });
+    throw lastError;
+  }
+
+  private async moveOnce(
+    tx: Prisma.TransactionClient,
+    cardId: string,
+    targetColumnId: string,
+    targetOrder: number,
+  ): Promise<Card> {
+    const locked = new Set<string>();
+    const initial = await tx.card.findUniqueOrThrow({ where: { id: cardId } });
+    if (initial.columnId !== targetColumnId) {
+      locked.add(initial.columnId);
+    }
+    locked.add(targetColumnId);
+    for (const columnId of [...locked].sort()) {
+      await this.lockColumn(tx, columnId);
+    }
+
+    // Перечитываем под локами: конкурентный перенос мог увести карточку
+    // в колонку, лок на которую ещё не взят, — дозахватываем (повторный вызов
+    // для уже взятого ключа реентерабелен) и работаем со свежими данными.
+    const card = await tx.card.findUniqueOrThrow({ where: { id: cardId } });
+    if (!locked.has(card.columnId)) {
+      await this.lockColumn(tx, card.columnId);
+      locked.add(card.columnId);
+    }
+
+    const fromColumnId = card.columnId;
+    const targetIds = await this.orderedIds(tx, targetColumnId);
+    const sourceIds =
+      fromColumnId === targetColumnId ? targetIds : await this.orderedIds(tx, fromColumnId);
+
+    const plan = planCardMove(sourceIds, targetIds, cardId, targetOrder);
+
+    if (fromColumnId !== targetColumnId) {
+      await tx.card.update({ where: { id: cardId }, data: { columnId: targetColumnId } });
+      await this.applyOrder(tx, plan.sourceIds);
+    }
+    await this.applyOrder(tx, plan.targetIds);
+
+    return tx.card.findUniqueOrThrow({ where: { id: cardId } });
   }
 
   setAssignee(id: string, assigneeId: string | null): Promise<Card> {
@@ -109,6 +168,17 @@ export class PrismaCardRepository implements ICardRepository {
 
   async remove(id: string): Promise<void> {
     await this.prisma.card.delete({ where: { id } });
+  }
+
+  /**
+   * Транзакционный advisory-лок по колонке. `pg_advisory_xact_lock` возвращает
+   * `void`, который Prisma не может десериализовать, поэтому результат приводится
+   * к int через `IS NULL`.
+   */
+  private async lockColumn(tx: Prisma.TransactionClient, columnId: string): Promise<void> {
+    await tx.$queryRaw`
+      SELECT (pg_advisory_xact_lock(hashtextextended(${columnId}, 0)) IS NULL)::int AS locked
+    `;
   }
 
   private orderedIds(tx: Prisma.TransactionClient, columnId: string): Promise<string[]> {
@@ -120,15 +190,31 @@ export class PrismaCardRepository implements ICardRepository {
   /**
    * Двухфазная перенормировка: сначала карточки уходят в «хвост» (вне `0..n-1`),
    * затем получают финальные `0..n-1`. Так промежуточные апдейты не сталкиваются
-   * по `order` при переходе карточки между колонками.
+   * по `order` при переходе карточки между колонками (и это останется безопасным,
+   * если у `Card` появится `@@unique([columnId, order])`). Каждая фаза — один
+   * bulk-апдейт: меньше round-trips и короче удержание блокировок строк.
    */
   private async applyOrder(tx: Prisma.TransactionClient, ids: string[]): Promise<void> {
-    const offset = ids.length + 1;
-    for (const [index, id] of ids.entries()) {
-      await tx.card.update({ where: { id }, data: { order: index + offset } });
+    if (ids.length === 0) {
+      return;
     }
-    for (const [index, id] of ids.entries()) {
-      await tx.card.update({ where: { id }, data: { order: index } });
-    }
+    await this.shiftOrders(tx, ids, ids.length + 1);
+    await this.shiftOrders(tx, ids, 0);
+  }
+
+  private async shiftOrders(
+    tx: Prisma.TransactionClient,
+    ids: string[],
+    offset: number,
+  ): Promise<void> {
+    const mapping = Prisma.join(
+      ids.map((id, index) => Prisma.sql`(${id}::text, ${index + offset}::int)`),
+    );
+    await tx.$queryRaw`
+      UPDATE "Card" AS card
+      SET "order" = mapping.order
+      FROM (VALUES ${mapping}) AS mapping(id, "order")
+      WHERE card.id = mapping.id
+    `;
   }
 }

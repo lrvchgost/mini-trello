@@ -23,4 +23,5 @@
 > [005 Socket.IO + SSE](docs/decisions/adr-005-realtime-sse-and-websocket.md) ·
 > [006 DnD](docs/decisions/adr-006-dnd-library.md) ·
 > [007 Recharts](docs/decisions/adr-007-charts-library.md) ·
-> [008 Ownership-only](docs/decisions/adr-008-ownership-only-access.md).
+> [008 Ownership-only](docs/decisions/adr-008-ownership-only-access.md) ·
+> [009 Конкурентные move](docs/decisions/adr-009-concurrent-card-moves.md).

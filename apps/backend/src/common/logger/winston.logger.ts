@@ -35,7 +35,12 @@ export class WinstonLogger implements LoggerService {
 
   private write(level: string, message: unknown, optionalParams: unknown[]): void {
     const context = optionalParams.find((param): param is string => typeof param === 'string');
-    this.logger.log(level, this.normalize(message), context ? { context } : {});
+    const error = optionalParams.find((param): param is Error => param instanceof Error);
+    const stack = error?.stack ?? (message instanceof Error ? message.stack : undefined);
+    this.logger.log(level, this.normalize(message), {
+      ...(context ? { context } : {}),
+      ...(stack ? { stack } : {}),
+    });
   }
 
   private normalize(message: unknown): string {

@@ -346,42 +346,94 @@ export class BoardAccessGuard implements CanActivate {
 `PATCH /api/cards/:id/move` с `{ columnId, order }` выполняется в транзакции и **перенормирует**
 `order` затронутых колонок в диапазон `0..n-1`. Транзакция и перенормировка живут в
 **репозитории** (`PrismaCardRepository.move`), сервис только оркестрирует — Prisma в сервис
-не протекает:
+не протекает.
+
+### Конкурентные переносы: advisory-локи + retry
+
+Два параллельных переноса в одну колонку раньше ловили дедлок PostgreSQL: транзакции
+обновляли одни и те же строки `Card` в разном порядке (READ COMMITTED), Prisma отдавал
+P2034 → 500. Теперь:
+
+1. **Advisory-локи** — в начале транзакции берётся `pg_advisory_xact_lock` по затронутым
+   columnId (исходная + целевая колонки) в **лексикографически отсортированном** порядке —
+   единый порядок захвата исключает дедлок, конкуренты коротко ждут очереди. Лок держится
+   до конца транзакции и снимается автоматически. Карточка **перечитывается под локами**:
+   если конкурентный перенос увёл её в третью колонку, лок на неё дозахватывается
+   (вызов реентерабелен), план строится по свежим данным.
+2. **Bulk-перенормировка** — каждая фаза двухпроходного обновления это один
+   `UPDATE ... FROM (VALUES ...)` вместо 2N построчных апдейтов: меньше round-trips,
+   короче удержание блокировок строк.
+3. **Retry на write-conflict** — остаточные конфликты (P2034/дедлок, включая редкую
+   гонку «одна карточка, три колонки») ретраются до 3 попыток с джиттером 50–150 мс
+   (`isWriteConflictError` из `common/prisma-errors.ts`).
+4. **409 вместо 500** — после исчерпания ретраев сервис маппит ошибку в
+   `ConflictException({ error: 'CONFLICT' })`: фронт откатывает optimistic-обновление
+   и подтягивает актуальный порядок.
 
 ```ts
 // cards/repositories/prisma-card.repository.ts (имплементация)
-async move(cardId: string, targetColumnId: string, targetOrder: number) {
-  return this.prisma.$transaction(async (tx) => {
-    const card = await tx.card.findUniqueOrThrow({ where: { id: cardId } });
-    const fromColumnId = card.columnId;
+async move(cardId: string, targetColumnId: string, targetOrder: number): Promise<Card> {
+  let lastError: unknown;
 
-    await tx.card.update({
-      where: { id: cardId },
-      data: { columnId: targetColumnId, order: targetOrder },
-    });
+  for (let attempt = 1; attempt <= MOVE_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await this.prisma.$transaction(async (tx) =>
+        this.moveOnce(tx, cardId, targetColumnId, targetOrder),
+      );
+    } catch (error) {
+      lastError = error;
+      if (!isWriteConflictError(error) || attempt === MOVE_RETRY_ATTEMPTS) {
+        throw error;
+      }
+      await delayMoveRetry(); // джиттер 50–150 мс
+    }
+  }
 
-    await this.renumber(tx, [targetColumnId, fromColumnId]);
-  });
+  throw lastError;
 }
 
-// cards/cards.service.ts (не знает Prisma)
-async moveCard(
-  cardId: string, targetColumnId: string, targetOrder: number,
-  boardId: string, actorId: string, clientId: string,
-) {
-  const card = await this.cardRepo.findById(cardId);
-  if (!card) throw new NotFoundException({ error: 'CARD_NOT_FOUND' });
+// moveOnce: advisory-локи (sorted) → перечитать карточку → план → два bulk-прохода
+private async moveOnce(tx: Prisma.TransactionClient, cardId: string, targetColumnId: string,
+                       targetOrder: number): Promise<Card> {
+  const locked = new Set<string>();
+  const initial = await tx.card.findUniqueOrThrow({ where: { id: cardId } });
+  if (initial.columnId !== targetColumnId) {
+    locked.add(initial.columnId);
+  }
+  locked.add(targetColumnId);
+  for (const columnId of [...locked].sort()) {
+    await this.lockColumn(tx, columnId);   // pg_advisory_xact_lock(hashtextextended(id, 0))
+  }
 
-  await this.cardRepo.move(cardId, targetColumnId, targetOrder);
-  await this.activityService.log(boardId, 'card.moved', { cardId, targetColumnId }, actorId);
-  this.cardsGateway.emitCardMoved({ cardId, targetColumnId, newOrder: targetOrder, actorId, clientId });
+  const card = await tx.card.findUniqueOrThrow({ where: { id: cardId } });
+  if (!locked.has(card.columnId)) {
+    await this.lockColumn(tx, card.columnId); // карточку увели в незалоченную колонку
+  }
+  // ... план через planCardMove, bulk-перенормировка затронутых колонок
+}
+```
+
+Сервис остаётся чистым — только маппинг ошибки:
+
+```ts
+// cards/cards.service.ts (не знает Prisma)
+try {
+  card = await this.cardRepo.move(id, input.columnId, input.order);
+} catch (error) {
+  if (isWriteConflictError(error)) {
+    throw new ConflictException({ error: ErrorCode.CONFLICT, message: 'Card move conflict, please retry' });
+  }
+  throw error;
 }
 ```
 
 - Перенормировка идёт в два прохода (сдвиг в «хвост», затем запись `0..n-1`) — безопасно,
   если позже на `Card` появится `@@unique([columnId, order])`.
 - На `Column` уже стоит `@@unique([boardId, order])`, поэтому перестановка колонок (если добавим)
-  обязана использовать двухфазный апдейт.
+  обязана использовать двухфазный апдейт; advisory-локи при этом тоже нужны — перенос карточки
+  и перенормировка колонок пересекаются по строкам.
+- Контракт `pg_advisory_xact_lock` возвращает `void`, который Prisma не десериализует —
+  результат приводится к int (`SELECT (... IS NULL)::int`), см. `lockColumn`.
 
 ## 6. Optimistic locking (`expectedUpdatedAt`)
 

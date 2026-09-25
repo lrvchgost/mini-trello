@@ -6,6 +6,7 @@ import {
   createTestApp,
   registerUser,
   truncateAllTables,
+  type CardDto,
   type TestApp,
   type TestSession,
 } from './utils';
@@ -286,5 +287,64 @@ describe('Cards (e2e)', () => {
       .expect(404);
 
     expect(response.body).toMatchObject({ error: 'COLUMN_NOT_FOUND' });
+  });
+
+  it('survives parallel moves within one column without 5xx and keeps orders unique', async () => {
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const column = await createColumn(testApp.app, alice, board.id, 'To Do');
+
+    const cards: CardDto[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      cards.push(await createCard(testApp.app, alice, column.id, `Card ${i + 1}`));
+    }
+
+    const statuses = await Promise.all(
+      cards.map(async (card) => {
+        const response = await request(testApp.app.getHttpServer())
+          .patch(`/api/cards/${card.id}/move`)
+          .set('Authorization', `Bearer ${alice.token}`)
+          .send({ columnId: column.id, order: cards.length - 1 });
+        return response.status;
+      }),
+    );
+
+    expect(statuses.filter((status) => status >= 500)).toEqual([]);
+
+    const [columnState] = await boardColumns(alice, board.id);
+    const orders = columnState!.cards.map((card) => card.order).sort((a, b) => a - b);
+    expect(orders).toEqual([...Array(cards.length).keys()]);
+  });
+
+  it('survives parallel cross-column moves and renumbers both columns', async () => {
+    const alice = await registerUser(testApp.app, 'alice@example.com');
+    const board = await createBoard(testApp.app, alice, 'My Board');
+    const todo = await createColumn(testApp.app, alice, board.id, 'To Do');
+    const doing = await createColumn(testApp.app, alice, board.id, 'Doing');
+
+    const cards: CardDto[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      cards.push(await createCard(testApp.app, alice, todo.id, `Card ${i + 1}`));
+    }
+
+    const statuses = await Promise.all(
+      cards.map(async (card, index) => {
+        const response = await request(testApp.app.getHttpServer())
+          .patch(`/api/cards/${card.id}/move`)
+          .set('Authorization', `Bearer ${alice.token}`)
+          .send({ columnId: doing.id, order: index });
+        return response.status;
+      }),
+    );
+
+    expect(statuses.filter((status) => status >= 500)).toEqual([]);
+
+    const [todoState, doingState] = await boardColumns(alice, board.id);
+    expect(todoState!.cards).toEqual([]);
+    expect(doingState!.cards.map((card) => card.id).sort()).toEqual(
+      cards.map((card) => card.id).sort(),
+    );
+    const orders = doingState!.cards.map((card) => card.order).sort((a, b) => a - b);
+    expect(orders).toEqual([...Array(cards.length).keys()]);
   });
 });
